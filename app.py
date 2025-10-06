@@ -8,6 +8,12 @@ import urllib.parse
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
+# --- FUNÇÃO DE CALLBACK PARA SINCRONIZAR PAGINAÇÃO ---
+def sync_page_widgets(source_key, target_key):
+    """Sincroniza o valor de dois widgets de paginação no estado da sessão."""
+    if source_key in st.session_state and target_key in st.session_state:
+        st.session_state[target_key] = st.session_state[source_key]
+
 # --- CONEXÃO COM O BANCO DE DADOS (usando Secrets do Streamlit) ---
 @st.cache_resource
 def init_connection():
@@ -169,7 +175,8 @@ if pagina_selecionada == "Navegador de Informativos":
                     df_final = df_final[df_final['busca'].str.contains(termo_busca_informativos.lower(), na=False)]
             
             st.session_state.df_filtrado = df_final
-            st.session_state.page_informativos = 1 # Reseta a página para 1 em cada nova busca
+            st.session_state.page_informativos_top = 1
+            st.session_state.page_informativos_bottom = 1
             st.session_state.titulo_resultados = "Resultados da Busca:" if informativo_selecionado == "Nenhum" else f"Conteúdo do Informativo: {informativo_selecionado}"
             st.session_state.filtros_ativos = (informativo_selecionado, orgao_selecionado_cat)
 
@@ -191,14 +198,15 @@ if pagina_selecionada == "Navegador de Informativos":
             elif sort_by == "Órgão (A-Z)": df_final = df_final.sort_values(by=['disciplina', 'orgao', 'assunto'])
 
             # Paginação e exibição
-            if 'page_informativos' not in st.session_state: st.session_state.page_informativos = 1
+            if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
+            if 'page_informativos_bottom' not in st.session_state: st.session_state.page_informativos_bottom = 1
             total_items = len(df_final)
             total_pages = math.ceil(total_items / ITEMS_PER_PAGE) if total_items > 0 else 1
             
-            st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos')
-            st.write(f"Mostrando página {st.session_state.page_informativos} de {total_pages} ({total_items} resultados).")
+            st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_top', on_change=sync_page_widgets, args=('page_informativos_top', 'page_informativos_bottom'))
+            st.write(f"Mostrando página {st.session_state.page_informativos_top} de {total_pages} ({total_items} resultados).")
             
-            start_index = (st.session_state.page_informativos - 1) * ITEMS_PER_PAGE
+            start_index = (st.session_state.page_informativos_top - 1) * ITEMS_PER_PAGE
             end_index = start_index + ITEMS_PER_PAGE
             df_pagina = df_final.iloc[start_index:end_index]
             st.divider()
@@ -210,7 +218,7 @@ if pagina_selecionada == "Navegador de Informativos":
                         for _, row in grupo_df.iterrows():
                             exibir_item_informativo_agrupado(row)
             if total_pages > 1:
-                st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos', label_visibility="collapsed")
+                st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_informativos_bottom', 'page_informativos_top'))
         
 elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     st.title("🔎 Pesquisa de Temas de Repercussão Geral e Repetitivos")
@@ -219,21 +227,23 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     with tab_stf:
         df_stf = carregar_dados_stf()
         if df_stf is not None:
-            if 'page_stf' not in st.session_state: st.session_state.page_stf = 1
+            if 'page_stf_top' not in st.session_state: st.session_state.page_stf_top = 1
+            if 'page_stf_bottom' not in st.session_state: st.session_state.page_stf_bottom = 1
             st.header("Pesquisar Temas do STF")
             termo_busca_stf = st.text_input("Buscar por (Ctrl+F):", key="busca_stf")
             df_resultado_stf = df_stf
             if termo_busca_stf:
                 df_resultado_stf = df_stf[df_stf['busca'].str.contains(termo_busca_stf.lower(), na=False)]
-                st.session_state.page_stf = 1 # Reseta a página ao buscar
+                st.session_state.page_stf_top = 1 
+                st.session_state.page_stf_bottom = 1
 
             total_items_stf = len(df_resultado_stf)
             total_pages_stf = math.ceil(total_items_stf / ITEMS_PER_PAGE) if total_items_stf > 0 else 1
 
-            st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf')
-            st.write(f"Mostrando página {st.session_state.page_stf} de {total_pages_stf} ({total_items_stf} temas encontrados).")
+            st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_top', on_change=sync_page_widgets, args=('page_stf_top', 'page_stf_bottom'))
+            st.write(f"Mostrando página {st.session_state.page_stf_top} de {total_pages_stf} ({total_items_stf} temas encontrados).")
             
-            start_index_stf = (st.session_state.page_stf - 1) * ITEMS_PER_PAGE
+            start_index_stf = (st.session_state.page_stf_top - 1) * ITEMS_PER_PAGE
             end_index_stf = start_index_stf + ITEMS_PER_PAGE
             df_pagina_stf = df_resultado_stf.iloc[start_index_stf:end_index_stf]
             st.divider()
@@ -250,35 +260,42 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 st.divider()
 
             if total_pages_stf > 1:
-                st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf', label_visibility="collapsed")
+                st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stf_bottom', 'page_stf_top'))
         else:
             st.error("Não foi possível carregar os dados do STF.")
 
     with tab_stj:
         df_stj = carregar_dados_stj()
         if df_stj is not None:
-            if 'page_stj' not in st.session_state: st.session_state.page_stj = 1
+            if 'page_stj_top' not in st.session_state: st.session_state.page_stj_top = 1
+            if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom = 1
             st.header("Pesquisar Temas do STJ")
             ramos_disponiveis = ["Todos"] + sorted(df_stj['Ramo do direito'].dropna().unique())
             ramo_selecionado = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
             termo_busca_stj = st.text_input("Buscar por (Ctrl+F):", key="busca_stj")
             
             df_resultado_stj = df_stj.copy()
+            if ramo_selecionado != st.session_state.get("ramo_selecionado_anterior", "Todos"):
+                st.session_state.page_stj_top = 1
+                st.session_state.page_stj_bottom = 1
+            st.session_state.ramo_selecionado_anterior = ramo_selecionado
+
             if ramo_selecionado != "Todos":
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['Ramo do direito'] == ramo_selecionado]
-                st.session_state.page_stj = 1 # Reseta a página ao filtrar
+
             if termo_busca_stj:
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['busca'].str.contains(termo_busca_stj.lower(), na=False)]
-                st.session_state.page_stj = 1 # Reseta a página ao buscar
+                st.session_state.page_stj_top = 1
+                st.session_state.page_stj_bottom = 1
             
             df_resultado_stj = df_resultado_stj.sort_values(by=['Ramo do direito', 'Tema'])
             total_items_stj = len(df_resultado_stj)
             total_pages_stj = math.ceil(total_items_stj / ITEMS_PER_PAGE) if total_items_stj > 0 else 1
 
-            st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj')
-            st.write(f"Mostrando página {st.session_state.page_stj} de {total_pages_stj} ({total_items_stj} temas encontrados).")
+            st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_top', on_change=sync_page_widgets, args=('page_stj_top', 'page_stj_bottom'))
+            st.write(f"Mostrando página {st.session_state.page_stj_top} de {total_pages_stj} ({total_items_stj} temas encontrados).")
             
-            start_index_stj = (st.session_state.page_stj - 1) * ITEMS_PER_PAGE
+            start_index_stj = (st.session_state.page_stj_top - 1) * ITEMS_PER_PAGE
             end_index_stj = start_index_stj + ITEMS_PER_PAGE
             df_pagina_stj = df_resultado_stj.iloc[start_index_stj:end_index_stj]
             st.divider()
@@ -291,7 +308,7 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                             exibir_item_stj_agrupado(row)
             
             if total_pages_stj > 1:
-                st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj', label_visibility="collapsed")
+                st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))
         else:
             st.error("Não foi possível carregar os dados do STJ.")
 
