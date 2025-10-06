@@ -2,17 +2,15 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
 import math
+import urllib.parse
 
 # --- CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
 # --- CONEXÃO COM O BANCO DE DADOS (usando Secrets do Streamlit) ---
-
-# A anotação @st.cache_resource garante que a conexão seja criada apenas uma vez.
 @st.cache_resource
 def init_connection():
-    """Inicializa a conexão com o banco de dados usando a string de conexão dos Secrets."""
     try:
         return create_engine(st.secrets["DB_CONNECTION_STRING"])
     except Exception as e:
@@ -22,11 +20,8 @@ def init_connection():
 engine = init_connection()
 
 # --- FUNÇÕES DE CARREGAMENTO DE DADOS DO BANCO DE DADOS ---
-
-# A anotação @st.cache_data cria um cache para os dados, evitando consultas repetidas ao banco.
-@st.cache_data(ttl=600) # O cache expira a cada 10 minutos (600 segundos)
+@st.cache_data(ttl=600)
 def carregar_dados_informativos():
-    """Carrega os dados dos informativos da tabela 'informativos' no banco de dados."""
     if engine is None: return None
     try:
         df = pd.read_sql_query("SELECT * FROM informativos", engine)
@@ -42,19 +37,14 @@ def carregar_dados_informativos():
 
 @st.cache_data(ttl=600)
 def carregar_dados_stf():
-    """Carrega os dados do STF da tabela 'temas_stf' no banco de dados."""
     if engine is None: return None
     try:
         df = pd.read_sql_query('SELECT * FROM temas_stf', engine)
-        # As aspas duplas são necessárias se os nomes das colunas no DB tiverem maiúsculas/espaços
-        colunas_stf_busca = ['"Tema"', '"Tese"', '"Leading Case"', '"Título"', '"Situação do Tema"']
-        # Renomeia as colunas para remover as aspas para facilitar o manuseio no pandas
         df.columns = [col.replace('"', '') for col in df.columns]
-        colunas_stf_busca_sem_aspas = [col.replace('"', '') for col in colunas_stf_busca]
-        
-        for col in colunas_stf_busca_sem_aspas:
+        colunas_stf_busca = ["Tema", "Tese", "Leading Case", "Título", "Situação do Tema"]
+        for col in colunas_stf_busca:
             if col not in df.columns: df[col] = ''
-        df['busca'] = df[colunas_stf_busca_sem_aspas].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
+        df['busca'] = df[colunas_stf_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
         st.error(f"Não foi possível carregar os dados do STF: {e}")
@@ -62,7 +52,6 @@ def carregar_dados_stf():
 
 @st.cache_data(ttl=600)
 def carregar_dados_stj():
-    """Carrega os dados do STJ da tabela 'temas_stj' no banco de dados."""
     if engine is None: return None
     try:
         df = pd.read_sql_query('SELECT * FROM temas_stj', engine)
@@ -76,25 +65,35 @@ def carregar_dados_stj():
         st.error(f"Não foi possível carregar os dados do STJ: {e}")
         return None
 
-
-# --- FUNÇÕES DE CALLBACK PARA SINCRONIZAR PAGINAÇÃO ---
-def sync_page(key1, key2):
-    if key1 in st.session_state and key2 in st.session_state:
-        if st.session_state[key1] != st.session_state[key2]:
-            if list(st.session_state.keys()).index(key1) < list(st.session_state.keys()).index(key2):
-                 st.session_state[key2] = st.session_state[key1]
-            else:
-                 st.session_state[key1] = st.session_state[key2]
-
 # --- FUNÇÕES AUXILIARES DE EXIBIÇÃO ---
 def exibir_item_informativo_agrupado(row):
-    assunto_str = str(row.get('assunto', 'N/A')) if pd.notna(row.get('assunto')) else ""
-    tese_str = str(row.get('tese', 'N/A')) if pd.notna(row.get('tese')) else ""
-    arquivo_pdf = row.get('arquivo_fonte', 'N/A').replace('.docx', '.pdf')
-    
-    st.markdown(f"**ASSUNTO:** {assunto_str.upper()}")
-    st.markdown(f"**TESE:** {tese_str} (Fonte: {arquivo_pdf}, **{row.get('orgao', 'N/A')}**)")
-    st.markdown("---")
+    try:
+        assunto_str = str(row.get('assunto', 'N/A')) if pd.notna(row.get('assunto')) else ""
+        tese_str = str(row.get('tese', 'N/A')) if pd.notna(row.get('tese')) else ""
+        arquivo_original = row.get('arquivo_fonte', 'N/A')
+        arquivo_pdf = arquivo_original.replace('.docx', '.pdf')
+        orgao = row.get('orgao', 'N/A')
+        
+        # Remove a extensão do arquivo para criar o termo de busca
+        termo_busca_base = arquivo_original.replace('.docx', '')
+        
+        # Constrói o termo de busca final
+        termo_de_busca = f"{termo_busca_base} dizer o direito"
+        
+        # Codifica o termo de busca para ser usado em um URL
+        query_codificada = urllib.parse.quote_plus(termo_de_busca)
+        
+        # Constrói o URL de busca do Google
+        google_search_url = f"https://www.google.com/search?q={query_codificada}"
+        
+        # Cria um link em Markdown
+        link_html = f'<a href="{google_search_url}" target="_blank">{arquivo_pdf}</a>'
+        
+        st.markdown(f"**ASSUNTO:** {assunto_str.upper()}")
+        st.markdown(f"**TESE:** {tese_str} em {link_html} **({orgao})**", unsafe_allow_html=True)
+        st.markdown("---")
+    except Exception as e:
+        st.error(f"Erro ao exibir item: {e}")
 
 def exibir_item_stj_agrupado(row):
     st.markdown(f"**TEMA:** {row.get('Tema', 'N/A')}")
@@ -131,12 +130,11 @@ if pagina_selecionada == "Navegador de Informativos":
             orgao_para_filtro_arquivo = st.radio("Escolha o Órgão:", options=["STF", "STJ"], horizontal=True, key="orgao_inf")
         with col_inf_select:
             informativos_disponiveis = ["Nenhum"]
-            df_orgao_especifico = df_indice[df_indice['orgao'] == orgao_para_filtro_arquivo]
-            informativos_disponiveis += sorted(df_orgao_especifico['arquivo_fonte'].str.replace('.docx', '.pdf').unique())
+            if not df_indice.empty:
+                df_orgao_especifico = df_indice[df_indice['orgao'] == orgao_para_filtro_arquivo]
+                informativos_disponiveis += sorted(df_orgao_especifico['arquivo_fonte'].str.replace('.docx', '.pdf').unique())
             informativo_selecionado = st.selectbox("Escolha o Informativo:", options=informativos_disponiveis, key="inf_select")
         
-        # O resto da lógica da interface...
-        # ... (código dos filtros, botões e exibição dos resultados permanece o mesmo)
         disciplina_selecionada_dentro_inf = "Todas"
         assunto_selecionado_dentro_inf = "Todos"
         if informativo_selecionado != "Nenhum":
@@ -198,7 +196,6 @@ if pagina_selecionada == "Navegador de Informativos":
             df_final = st.session_state.df_filtrado
             st.subheader(st.session_state.titulo_resultados)
             
-            # Ordenação
             sort_options = ["Padrão (Disciplina, Assunto)"]
             if st.session_state.get('informativo_selecionado', 'Nenhum') == "Nenhum":
                 if st.session_state.get('orgao_selecionado_cat', 'Todos') == "Todos": sort_options.append("Órgão (A-Z)")
@@ -214,7 +211,6 @@ if pagina_selecionada == "Navegador de Informativos":
             elif sort_by == "Órgão (A-Z)":
                 df_final = df_final.sort_values(by=['disciplina', 'orgao', 'assunto'])
 
-            # Paginação e exibição
             total_items = len(df_final)
             total_pages = math.ceil(total_items / ITEMS_PER_PAGE) if total_items > 0 else 1
             
@@ -232,10 +228,8 @@ if pagina_selecionada == "Navegador de Informativos":
                     with st.container(border=True):
                         for _, row in grupo_df.iterrows():
                             exibir_item_informativo_agrupado(row)
-
             if total_pages > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_bottom')
-                # Lógica de sincronização pode ser adicionada aqui se necessário
         
 elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     st.title("🔎 Pesquisa de Temas de Repercussão Geral e Repetitivos")
