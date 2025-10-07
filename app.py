@@ -8,6 +8,28 @@ import urllib.parse
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
+# --- INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
+# Este bloco garante que as variáveis de estado existam desde o início.
+if 'df_filtrado' not in st.session_state:
+    st.session_state.df_filtrado = pd.DataFrame()
+if 'titulo_resultados' not in st.session_state:
+    st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
+if 'filtros_ativos' not in st.session_state:
+    st.session_state.filtros_ativos = ("Nenhum", "Todos")
+if 'page_informativos_top' not in st.session_state:
+    st.session_state.page_informativos_top = 1
+if 'page_informativos_bottom' not in st.session_state:
+    st.session_state.page_informativos_bottom = 1
+if 'page_stf_top' not in st.session_state:
+    st.session_state.page_stf_top = 1
+if 'page_stf_bottom' not in st.session_state:
+    st.session_state.page_stf_bottom = 1
+if 'page_stj_top' not in st.session_state:
+    st.session_state.page_stj_top = 1
+if 'page_stj_bottom' not in st.session_state:
+    st.session_state.page_stj_bottom = 1
+
+
 # --- FUNÇÃO DE CALLBACK PARA SINCRONIZAR PAGINAÇÃO ---
 def sync_page_widgets(source_key, target_key):
     """Sincroniza o valor de dois widgets de paginação no estado da sessão."""
@@ -180,9 +202,11 @@ if pagina_selecionada == "Navegador de Informativos":
             st.session_state.titulo_resultados = "Resultados da Busca:" if informativo_selecionado == "Nenhum" else f"Conteúdo do Informativo: {informativo_selecionado}"
             st.session_state.filtros_ativos = (informativo_selecionado, orgao_selecionado_cat)
 
-        if 'df_filtrado' in st.session_state and not st.session_state.df_filtrado.empty:
+        
+        st.subheader(st.session_state.titulo_resultados)
+        
+        if not st.session_state.df_filtrado.empty:
             df_final = st.session_state.df_filtrado
-            st.subheader(st.session_state.titulo_resultados)
             
             # Ordenação
             sort_options = ["Padrão (Disciplina, Assunto)"]
@@ -198,8 +222,6 @@ if pagina_selecionada == "Navegador de Informativos":
             elif sort_by == "Órgão (A-Z)": df_final = df_final.sort_values(by=['disciplina', 'orgao', 'assunto'])
 
             # Paginação e exibição
-            if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
-            if 'page_informativos_bottom' not in st.session_state: st.session_state.page_informativos_bottom = 1
             total_items = len(df_final)
             total_pages = math.ceil(total_items / ITEMS_PER_PAGE) if total_items > 0 else 1
             
@@ -227,8 +249,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     with tab_stf:
         df_stf = carregar_dados_stf()
         if df_stf is not None:
-            if 'page_stf_top' not in st.session_state: st.session_state.page_stf_top = 1
-            if 'page_stf_bottom' not in st.session_state: st.session_state.page_stf_bottom = 1
             st.header("Pesquisar Temas do STF")
             termo_busca_stf = st.text_input("Buscar por (Ctrl+F):", key="busca_stf")
             df_resultado_stf = df_stf
@@ -267,8 +287,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     with tab_stj:
         df_stj = carregar_dados_stj()
         if df_stj is not None:
-            if 'page_stj_top' not in st.session_state: st.session_state.page_stj_top = 1
-            if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom = 1
             st.header("Pesquisar Temas do STJ")
             ramos_disponiveis = ["Todos"] + sorted(df_stj['Ramo do direito'].dropna().unique())
             ramo_selecionado = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
