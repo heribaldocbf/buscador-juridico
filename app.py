@@ -136,7 +136,13 @@ if pagina_selecionada == "Navegador de Informativos":
     else:
         st.header("Selecione os Filtros")
         
-        # Lógica de filtros ...
+        # --- CORREÇÃO: INICIALIZAÇÃO DE VARIÁVEIS DE FILTRO ---
+        orgao_selecionado_cat = "Todos"
+        disciplina_selecionada_cat = "Todos"
+        assunto_selecionado_cat = "Todos"
+        termo_busca_informativos = ""
+        # --- FIM DA CORREÇÃO ---
+        
         st.subheader("Filtrar por um Informativo Específico")
         col_org_inf, col_inf_select = st.columns(2)
         with col_org_inf:
@@ -193,7 +199,7 @@ if pagina_selecionada == "Navegador de Informativos":
                 if orgao_selecionado_cat != "Todos": df_final = df_final[df_final['orgao'] == orgao_selecionado_cat]
                 if disciplina_selecionada_cat != "Todas": df_final = df_final[df_final['disciplina'] == disciplina_selecionada_cat]
                 if assunto_selecionado_cat != "Todos": df_final = df_final[df_final['assunto'] == assunto_selecionado_cat]
-                if 'termo_busca_informativos' in locals() and termo_busca_informativos:
+                if termo_busca_informativos:
                     df_final = df_final[df_final['busca'].str.contains(termo_busca_informativos.lower(), na=False)]
             
             st.session_state.df_filtrado = df_final
@@ -201,7 +207,6 @@ if pagina_selecionada == "Navegador de Informativos":
             st.session_state.page_informativos_bottom = 1
             st.session_state.titulo_resultados = "Resultados da Busca:" if informativo_selecionado == "Nenhum" else f"Conteúdo do Informativo: {informativo_selecionado}"
             st.session_state.filtros_ativos = (informativo_selecionado, orgao_selecionado_cat)
-
         
         st.subheader(st.session_state.titulo_resultados)
         
