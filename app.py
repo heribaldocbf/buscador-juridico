@@ -9,7 +9,6 @@ ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
 # --- INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
-# Este bloco garante que as variáveis de estado existam desde o início.
 if 'df_filtrado' not in st.session_state:
     st.session_state.df_filtrado = pd.DataFrame()
 if 'titulo_resultados' not in st.session_state:
@@ -136,12 +135,11 @@ if pagina_selecionada == "Navegador de Informativos":
     else:
         st.header("Selecione os Filtros")
         
-        # --- CORREÇÃO: INICIALIZAÇÃO DE VARIÁVEIS DE FILTRO ---
+        # --- INICIALIZAÇÃO DE VARIÁVEIS DE FILTRO ---
         orgao_selecionado_cat = "Todos"
         disciplina_selecionada_cat = "Todos"
         assunto_selecionado_cat = "Todos"
         termo_busca_informativos = ""
-        # --- FIM DA CORREÇÃO ---
         
         st.subheader("Filtrar por um Informativo Específico")
         col_org_inf, col_inf_select = st.columns(2)
@@ -151,7 +149,8 @@ if pagina_selecionada == "Navegador de Informativos":
             informativos_disponiveis = ["Nenhum"]
             if not df_indice.empty:
                 df_orgao_especifico = df_indice[df_indice['orgao'] == orgao_para_filtro_arquivo]
-                informativos_disponiveis += sorted(df_orgao_especifico['arquivo_fonte'].str.replace('.docx', '.pdf').unique())
+                # --- ALTERAÇÃO AQUI: adicionado reverse=True para ordenação decrescente ---
+                informativos_disponiveis += sorted(df_orgao_especifico['arquivo_fonte'].str.replace('.docx', '.pdf').unique(), reverse=True)
             informativo_selecionado = st.selectbox("Escolha o Informativo:", options=informativos_disponiveis, key="inf_select")
         
         disciplina_selecionada_dentro_inf = "Todas"
