@@ -149,8 +149,12 @@ if pagina_selecionada == "Navegador de Informativos":
             informativos_disponiveis = ["Nenhum"]
             if not df_indice.empty:
                 df_orgao_especifico = df_indice[df_indice['orgao'] == orgao_para_filtro_arquivo]
-                # --- ALTERAÇÃO AQUI: adicionado reverse=True para ordenação decrescente ---
-                informativos_disponiveis += sorted(df_orgao_especifico['arquivo_fonte'].str.replace('.docx', '.pdf').unique(), reverse=True)
+                
+                # --- ALTERAÇÃO AQUI: Ordena numericamente pela coluna 'num_inf' ---
+                df_sorted = df_orgao_especifico.sort_values(by='num_inf', ascending=False)
+                lista_ordenada = df_sorted['arquivo_fonte'].str.replace('.docx', '.pdf').unique().tolist()
+                informativos_disponiveis += lista_ordenada
+
             informativo_selecionado = st.selectbox("Escolha o Informativo:", options=informativos_disponiveis, key="inf_select")
         
         disciplina_selecionada_dentro_inf = "Todas"
