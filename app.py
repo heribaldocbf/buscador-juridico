@@ -33,7 +33,8 @@ if 'page_stj_bottom' not in st.session_state:
 def sync_page_widgets(source_key, target_key):
     """Sincroniza o valor de dois widgets de paginação no estado da sessão."""
     if source_key in st.session_state and target_key in st.session_state:
-        st.session_state[target_key] = st.session_state[source_key]
+        if st.session_state[source_key] != st.session_state[target_key]:
+             st.session_state[target_key] = st.session_state[source_key]
 
 # --- CONEXÃO COM O BANCO DE DADOS (usando Secrets do Streamlit) ---
 @st.cache_resource
@@ -123,7 +124,7 @@ def exibir_item_stj_agrupado(row):
     st.markdown("---")
 
 def botao_imprimir():
-    """Cria um botão HTML estilizado para imprimir a página, com CSS para otimizar a impressão."""
+    """Cria um botão HTML para imprimir a página, usando st.components.v1.html para maior fiabilidade."""
     print_button_html = """
     <style>
     @media print {
@@ -175,7 +176,7 @@ def botao_imprimir():
         </button>
     </div>
     """
-    st.markdown(print_button_html, unsafe_allow_html=True)
+    st.components.v1.html(print_button_html, height=80)
 
 # --- INTERFACE PRINCIPAL ---
 st.sidebar.title("Menu de Navegação")
