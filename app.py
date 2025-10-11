@@ -173,7 +173,7 @@ def exibir_item_stj_agrupado(row):
     st.markdown("---")
 
 def botao_imprimir():
-    """Cria um botão HTML para imprimir a página, usando st.components.v1.html."""
+    """Cria um botão HTML para imprimir a página, usando st.markdown."""
     print_button_html = """
     <div class="print-button-container">
         <button onclick="window.print()" class="print-button">
@@ -181,7 +181,7 @@ def botao_imprimir():
         </button>
     </div>
     """
-    st.components.v1.html(print_button_html, height=80)
+    st.markdown(print_button_html, unsafe_allow_html=True)
 
 # --- INTERFACE PRINCIPAL ---
 st.sidebar.title("Menu de Navegação")
@@ -258,7 +258,7 @@ if pagina_selecionada == "Navegador de Informativos":
             else:
                 df_final = df_indice.copy()
                 if orgao_selecionado_cat != "Todos": df_final = df_final[df_final['orgao'] == orgao_selecionado_cat]
-                if disciplina_selecionada_cat != "Todas": df_final = df_final[df_final['disciplina'] == disciplina_selecionada_cat]
+                if disciplina_selecionada_cat != "Todos": df_final = df_final[df_final['disciplina'] == disciplina_selecionada_cat]
                 if assunto_selecionado_cat != "Todos": df_final = df_final[df_final['assunto'] == assunto_selecionado_cat]
                 if termo_busca_informativos:
                     df_final = df_final[df_final['busca'].str.contains(termo_busca_informativos.lower(), na=False)]
