@@ -8,6 +8,56 @@ import urllib.parse
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
+# --- CSS GLOBAL PARA IMPRESSÃO E ESTILO DO BOTÃO ---
+PRINT_CSS = """
+<style>
+@media print {
+    /* Esconde a barra lateral, cabeçalho da app e todos os elementos de interface */
+    .stSidebar, .stHeader, .viewer-header, .stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput, .stTabs, .stExpander > header {
+        display: none !important;
+    }
+    /* Esconde o próprio botão de imprimir */
+    .print-button-container {
+        display: none !important;
+    }
+    /* Garante que o container principal ocupe a largura total e ajusta o padding */
+    .main .block-container {
+        padding: 1rem 1rem 1rem 1rem !important;
+    }
+    /* Evita quebras de página ruins */
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+    }
+    div[data-testid="stVerticalBlock"] {
+        page-break-inside: avoid;
+    }
+}
+/* Estilos para o botão de impressão (visível apenas no ecrã) */
+.print-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}
+.print-button {
+    background-color: #FF4B4B;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+.print-button:hover {
+    background-color: #E03C3C;
+}
+</style>
+"""
+st.markdown(PRINT_CSS, unsafe_allow_html=True)
+
+
 # --- INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
 if 'df_filtrado' not in st.session_state:
     st.session_state.df_filtrado = pd.DataFrame()
@@ -31,7 +81,6 @@ if 'page_stj_bottom' not in st.session_state:
 
 # --- FUNÇÃO DE CALLBACK PARA SINCRONIZAR PAGINAÇÃO ---
 def sync_page_widgets(source_key, target_key):
-    """Sincroniza o valor de dois widgets de paginação no estado da sessão."""
     if source_key in st.session_state and target_key in st.session_state:
         if st.session_state[source_key] != st.session_state[target_key]:
              st.session_state[target_key] = st.session_state[source_key]
@@ -47,7 +96,7 @@ def init_connection():
 
 engine = init_connection()
 
-# --- FUNÇÕES DE CARREGAMENTO DE DADOS DO BANCO DE DADOS ---
+# --- FUNÇÕES DE CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=600)
 def carregar_dados_informativos():
     if engine is None: return None
@@ -124,52 +173,8 @@ def exibir_item_stj_agrupado(row):
     st.markdown("---")
 
 def botao_imprimir():
-    """Cria um botão HTML para imprimir a página, usando st.components.v1.html para maior fiabilidade."""
+    """Cria um botão HTML para imprimir a página, usando st.components.v1.html."""
     print_button_html = """
-    <style>
-    @media print {
-        body {
-            -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
-            color-adjust: exact !important; /* Firefox */
-        }
-        /* Esconde elementos indesejados na impressão */
-        .stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput, 
-        .stSidebar, .stTabs, .stExpander header, .stHeader, .viewer-header {
-            display: none !important;
-        }
-        /* Ajusta o layout da página para impressão */
-        .main .block-container {
-            padding-top: 1rem !important;
-            padding-bottom: 1rem !important;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            page-break-after: avoid;
-        }
-        div[data-testid="stVerticalBlock"] {
-             page-break-inside: avoid;
-        }
-    }
-    .print-button-container {
-        display: flex;
-        justify-content: center;
-        margin-top: 2rem;
-        margin-bottom: 2rem;
-    }
-    .print-button {
-        background-color: #FF4B4B;
-        color: white;
-        padding: 0.6rem 1.2rem;
-        border-radius: 0.5rem;
-        border: none;
-        font-weight: bold;
-        font-size: 16px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
-    .print-button:hover {
-        background-color: #E03C3C;
-    }
-    </style>
     <div class="print-button-container">
         <button onclick="window.print()" class="print-button">
             🖨️ Imprimir Resultados
