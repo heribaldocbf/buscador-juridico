@@ -122,6 +122,61 @@ def exibir_item_stj_agrupado(row):
                 st.markdown(f"**{col}:** {row[col]}")
     st.markdown("---")
 
+def botao_imprimir():
+    """Cria um botão HTML estilizado para imprimir a página, com CSS para otimizar a impressão."""
+    print_button_html = """
+    <style>
+    @media print {
+        body {
+            -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
+            color-adjust: exact !important; /* Firefox */
+        }
+        /* Esconde elementos indesejados na impressão */
+        .stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput, 
+        .stSidebar, .stTabs, .stExpander header, .stHeader, .viewer-header {
+            display: none !important;
+        }
+        /* Ajusta o layout da página para impressão */
+        .main .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            page-break-after: avoid;
+        }
+        div[data-testid="stVerticalBlock"] {
+             page-break-inside: avoid;
+        }
+    }
+    .print-button-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+    .print-button {
+        background-color: #FF4B4B;
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.5rem;
+        border: none;
+        font-weight: bold;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .print-button:hover {
+        background-color: #E03C3C;
+    }
+    </style>
+    <div class="print-button-container">
+        <button onclick="window.print()" class="print-button">
+            🖨️ Imprimir Resultados
+        </button>
+    </div>
+    """
+    st.markdown(print_button_html, unsafe_allow_html=True)
+
 # --- INTERFACE PRINCIPAL ---
 st.sidebar.title("Menu de Navegação")
 pagina_selecionada = st.sidebar.radio("Escolha a ferramenta:", ["Navegador de Informativos", "Pesquisa de Temas (STF/STJ)", "Súmulas"])
@@ -135,7 +190,6 @@ if pagina_selecionada == "Navegador de Informativos":
     else:
         st.header("Selecione os Filtros")
         
-        # --- INICIALIZAÇÃO DE VARIÁVEIS DE FILTRO ---
         orgao_selecionado_cat = "Todos"
         disciplina_selecionada_cat = "Todos"
         assunto_selecionado_cat = "Todos"
@@ -149,8 +203,6 @@ if pagina_selecionada == "Navegador de Informativos":
             informativos_disponiveis = ["Nenhum"]
             if not df_indice.empty:
                 df_orgao_especifico = df_indice[df_indice['orgao'] == orgao_para_filtro_arquivo]
-                
-                # --- ALTERAÇÃO AQUI: Ordena numericamente pela coluna 'num_inf' ---
                 df_sorted = df_orgao_especifico.sort_values(by='num_inf', ascending=False)
                 lista_ordenada = df_sorted['arquivo_fonte'].str.replace('.docx', '.pdf').unique().tolist()
                 informativos_disponiveis += lista_ordenada
@@ -249,6 +301,8 @@ if pagina_selecionada == "Navegador de Informativos":
                             exibir_item_informativo_agrupado(row)
             if total_pages > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_informativos_bottom', 'page_informativos_top'))
+            
+            botao_imprimir()
         
 elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     st.title("🔎 Pesquisa de Temas de Repercussão Geral e Repetitivos")
@@ -276,19 +330,23 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             df_pagina_stf = df_resultado_stf.iloc[start_index_stf:end_index_stf]
             st.divider()
             
-            for _, row in df_pagina_stf.iterrows():
-                st.markdown(f"**Tema:** {row.get('Tema', 'N/A')}")
-                st.markdown(f"**Título:** {row.get('Título', 'N/A')}")
-                st.markdown(f"**Tese:** {row.get('Tese', 'N/A')}")
-                with st.expander("Ver mais detalhes"):
-                    colunas_todas_stf = ["Leading Case", "Situação do Tema", "Data do Julgamento", "Data da Tese"]
-                    for col in colunas_todas_stf:
-                        if col in row and pd.notna(row[col]):
-                            st.markdown(f"**{col}:** {row[col]}")
-                st.divider()
+            if not df_pagina_stf.empty:
+                for _, row in df_pagina_stf.iterrows():
+                    st.markdown(f"**Tema:** {row.get('Tema', 'N/A')}")
+                    st.markdown(f"**Título:** {row.get('Título', 'N/A')}")
+                    st.markdown(f"**Tese:** {row.get('Tese', 'N/A')}")
+                    with st.expander("Ver mais detalhes"):
+                        colunas_todas_stf = ["Leading Case", "Situação do Tema", "Data do Julgamento", "Data da Tese"]
+                        for col in colunas_todas_stf:
+                            if col in row and pd.notna(row[col]):
+                                st.markdown(f"**{col}:** {row[col]}")
+                    st.divider()
 
             if total_pages_stf > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stf_bottom', 'page_stf_top'))
+            
+            if not df_pagina_stf.empty:
+                botao_imprimir()
         else:
             st.error("Não foi possível carregar os dados do STF.")
 
@@ -335,6 +393,9 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             
             if total_pages_stj > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))
+
+            if not df_pagina_stj.empty:
+                botao_imprimir()
         else:
             st.error("Não foi possível carregar os dados do STJ.")
 
