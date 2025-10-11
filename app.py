@@ -8,56 +8,6 @@ import urllib.parse
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
-# --- CSS GLOBAL PARA IMPRESSÃO E ESTILO DO BOTÃO ---
-PRINT_CSS = """
-<style>
-@media print {
-    /* Esconde a barra lateral, cabeçalho da app e todos os elementos de interface */
-    .stSidebar, .stHeader, .viewer-header, .stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput, .stTabs, .stExpander > header {
-        display: none !important;
-    }
-    /* Esconde o próprio botão de imprimir */
-    .print-button-container {
-        display: none !important;
-    }
-    /* Garante que o container principal ocupe a largura total e ajusta o padding */
-    .main .block-container {
-        padding: 1rem 1rem 1rem 1rem !important;
-    }
-    /* Evita quebras de página ruins */
-    h1, h2, h3, h4, h5, h6 {
-        page-break-after: avoid;
-    }
-    div[data-testid="stVerticalBlock"] {
-        page-break-inside: avoid;
-    }
-}
-/* Estilos para o botão de impressão (visível apenas no ecrã) */
-.print-button-container {
-    display: flex;
-    justify-content: center;
-    margin-top: 2rem;
-    margin-bottom: 2rem;
-}
-.print-button {
-    background-color: #FF4B4B;
-    color: white;
-    padding: 0.6rem 1.2rem;
-    border-radius: 0.5rem;
-    border: none;
-    font-weight: bold;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-.print-button:hover {
-    background-color: #E03C3C;
-}
-</style>
-"""
-st.markdown(PRINT_CSS, unsafe_allow_html=True)
-
-
 # --- INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
 if 'df_filtrado' not in st.session_state:
     st.session_state.df_filtrado = pd.DataFrame()
@@ -171,17 +121,6 @@ def exibir_item_stj_agrupado(row):
             if col in row and pd.notna(row[col]):
                 st.markdown(f"**{col}:** {row[col]}")
     st.markdown("---")
-
-def botao_imprimir():
-    """Cria um botão HTML para imprimir a página, usando st.components.v1.html."""
-    print_button_html = """
-    <div class="print-button-container">
-        <button onclick="window.print()" class="print-button">
-            🖨️ Imprimir Resultados
-        </button>
-    </div>
-    """
-    st.components.v1.html(print_button_html, height=70)
 
 # --- INTERFACE PRINCIPAL ---
 st.sidebar.title("Menu de Navegação")
@@ -307,8 +246,6 @@ if pagina_selecionada == "Navegador de Informativos":
                             exibir_item_informativo_agrupado(row)
             if total_pages > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_informativos_bottom', 'page_informativos_top'))
-            
-            botao_imprimir()
         
 elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     st.title("🔎 Pesquisa de Temas de Repercussão Geral e Repetitivos")
@@ -350,9 +287,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
 
             if total_pages_stf > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stf_bottom', 'page_stf_top'))
-            
-            if not df_pagina_stf.empty:
-                botao_imprimir()
         else:
             st.error("Não foi possível carregar os dados do STF.")
 
@@ -400,8 +334,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             if total_pages_stj > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))
 
-            if not df_pagina_stj.empty:
-                botao_imprimir()
         else:
             st.error("Não foi possível carregar os dados do STJ.")
 
