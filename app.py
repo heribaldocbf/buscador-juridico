@@ -120,7 +120,8 @@ def carregar_dados_stj():
         # Garante numérico
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
 
-        colunas_stj_busca = ["Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema"]
+        # Adiciona "Questão submetida a julgamento" na busca
+        colunas_stj_busca = ["Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema", "Questão submetida a julgamento"]
         for col in colunas_stj_busca:
             if col not in df.columns: df[col] = ''
         df['busca'] = df[colunas_stj_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
@@ -161,7 +162,7 @@ if is_admin:
     st.sidebar.success("Modo Edição Ativado ✅")
 
 
-# === PÁGINA 1: INFORMATIVOS (COM TODAS AS FUNCIONALIDADES ORIGINAIS) ===
+# === PÁGINA 1: INFORMATIVOS ===
 if pagina_selecionada == "Navegador de Informativos":
     st.title("📚 Navegador de Índices Jurídicos")
     df_indice = carregar_dados_informativos()
@@ -250,7 +251,7 @@ if pagina_selecionada == "Navegador de Informativos":
         if not st.session_state.df_filtrado.empty:
             df_final = st.session_state.df_filtrado
             
-            # --- ORDENAÇÃO (RESTAURADA) ---
+            # --- ORDENAÇÃO ---
             sort_options = ["Padrão (Disciplina, Assunto)"]
             info_sel, orgao_sel = st.session_state.get('filtros_ativos', ("Nenhum", "Todos"))
             if info_sel == "Nenhum":
@@ -337,7 +338,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 for _, row in df_pagina_stf.iterrows():
                     ramo_atual = row.get('Ramo do Direito', 'Não Classificado')
                     
-                    # Layout: Tema + Ramo | Título | Tese visíveis
                     st.markdown(f"#### Tema {row.get('Tema', 'N/A')} :blue-background[{ramo_atual}]")
                     st.markdown(f"**Título:** {row.get('Título', 'N/A')}")
                     st.markdown(f"**Tese:** {row.get('Tese', 'Pendente')}")
@@ -421,6 +421,8 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 for _, row in df_pagina_stj.iterrows():
                     ramo = row.get('Ramo do direito', 'N/A')
                     st.markdown(f"#### Tema {row['Tema']} :blue-background[{ramo}]")
+                    # NOVO LAYOUT DO STJ: QUESTÃO + TESE VISÍVEIS
+                    st.markdown(f"**Questão submetida a julgamento:** {row.get('Questão submetida a julgamento', '-')}")
                     st.markdown(f"**Tese Firmada:** {row.get('Tese Firmada', '-')}")
                     
                     with st.expander("Ver Detalhes"):
