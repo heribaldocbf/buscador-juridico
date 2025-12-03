@@ -9,9 +9,9 @@ ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
-SENHA_ADMIN = "060147mae"
+SENHA_ADMIN = "admin123"
 
-# Lista completa de Ramos para o menu de edição
+# Lista completa de Ramos para edição
 LISTA_RAMOS_COMPLETA = sorted([
     "Direito Administrativo", "Direito Ambiental", "Direito Civil", 
     "Direito Constitucional", "Direito do Consumidor", "Direito do Trabalho", 
@@ -22,19 +22,24 @@ LISTA_RAMOS_COMPLETA = sorted([
 ])
 
 # --- 2. INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
-if 'df_filtrado' not in st.session_state: st.session_state.df_filtrado = pd.DataFrame()
-if 'titulo_resultados' not in st.session_state: st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
-if 'filtros_ativos' not in st.session_state: st.session_state.filtros_ativos = ("Nenhum", "Todos")
+if 'df_filtrado' not in st.session_state:
+    st.session_state.df_filtrado = pd.DataFrame()
+if 'titulo_resultados' not in st.session_state:
+    st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
+if 'filtros_ativos' not in st.session_state:
+    st.session_state.filtros_ativos = ("Nenhum", "Todos")
 
-# Paginação
+# Paginação - Informativos
 if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
 if 'page_informativos_bottom' not in st.session_state: st.session_state.page_informativos_bottom = 1
+
+# Paginação - Temas
 if 'page_stf_top' not in st.session_state: st.session_state.page_stf_top = 1
 if 'page_stf_bottom' not in st.session_state: st.session_state.page_stf_bottom = 1
 if 'page_stj_top' not in st.session_state: st.session_state.page_stj_top = 1
 if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom = 1
 
-# Controle de Atualização (Admin)
+# Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
 def sync_page_widgets(source_key, target_key):
@@ -60,7 +65,7 @@ def atualizar_ramo_stf(tema_id, novo_ramo):
         with engine.begin() as conn:
             stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo WHERE "Tema" = :tema')
             conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
-        st.cache_data.clear() 
+        st.cache_data.clear()
         st.session_state.data_needs_refresh = True
         return True
     except Exception as e:
@@ -80,7 +85,7 @@ def carregar_dados_informativos():
         df['busca'] = df[colunas_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
-        st.error(f"Erro Informativos: {e}")
+        st.error(f"Não foi possível carregar os dados dos informativos: {e}")
         return None
 
 @st.cache_data(ttl=600)
@@ -89,12 +94,13 @@ def carregar_dados_stf():
     try:
         df = pd.read_sql_query('SELECT * FROM temas_stf', engine)
         df.columns = [col.replace('"', '') for col in df.columns]
-        
-        # Garante numérico para ordenação correta
+        # Garante numérico
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
-
-        if 'Ramo do Direito' not in df.columns: df['Ramo do Direito'] = 'Não Classificado'
-        else: df['Ramo do Direito'] = df['Ramo do Direito'].fillna('Não Classificado')
+        
+        if 'Ramo do Direito' not in df.columns: 
+            df['Ramo do Direito'] = 'Não Classificado'
+        else:
+            df['Ramo do Direito'] = df['Ramo do Direito'].fillna('Não Classificado')
 
         colunas_stf_busca = ["Tema", "Tese", "Leading Case", "Título", "Situação do Tema", "Ramo do Direito"]
         for col in colunas_stf_busca:
@@ -102,7 +108,7 @@ def carregar_dados_stf():
         df['busca'] = df[colunas_stf_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
-        st.error(f"Erro STF: {e}")
+        st.error(f"Não foi possível carregar os dados do STF: {e}")
         return None
 
 @st.cache_data(ttl=600)
@@ -111,17 +117,16 @@ def carregar_dados_stj():
     try:
         df = pd.read_sql_query('SELECT * FROM temas_stj', engine)
         df.columns = [col.replace('"', '') for col in df.columns]
-
-        # Garante numérico para ordenação correta
+        # Garante numérico
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
-        
+
         colunas_stj_busca = ["Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema"]
         for col in colunas_stj_busca:
             if col not in df.columns: df[col] = ''
         df['busca'] = df[colunas_stj_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
-        st.error(f"Erro STJ: {e}")
+        st.error(f"Não foi possível carregar os dados do STJ: {e}")
         return None
 
 # --- FUNÇÕES AUXILIARES DE EXIBIÇÃO ---
@@ -145,8 +150,6 @@ def exibir_item_informativo_agrupado(row):
         st.error(f"Erro ao exibir item: {e}")
 
 # --- 5. INTERFACE PRINCIPAL ---
-
-# Sidebar: Menu e Login
 st.sidebar.title("Menu de Navegação")
 pagina_selecionada = st.sidebar.radio("Escolha a ferramenta:", ["Navegador de Informativos", "Pesquisa de Temas (STF/STJ)", "Súmulas"])
 
@@ -158,13 +161,13 @@ if is_admin:
     st.sidebar.success("Modo Edição Ativado ✅")
 
 
-# === PÁGINA 1: INFORMATIVOS ===
+# === PÁGINA 1: INFORMATIVOS (COM TODAS AS FUNCIONALIDADES ORIGINAIS) ===
 if pagina_selecionada == "Navegador de Informativos":
     st.title("📚 Navegador de Índices Jurídicos")
     df_indice = carregar_dados_informativos()
     
     if df_indice is None:
-        st.error("Não foi possível carregar os dados dos informativos. Verifique a conexão com o banco de dados.")
+        st.error("Não foi possível carregar os dados dos informativos.")
     else:
         st.header("Selecione os Filtros")
         
@@ -189,6 +192,7 @@ if pagina_selecionada == "Navegador de Informativos":
         
         disciplina_selecionada_dentro_inf = "Todas"
         assunto_selecionado_dentro_inf = "Todos"
+        
         if informativo_selecionado != "Nenhum":
             st.markdown("##### Filtrar conteúdo dentro do informativo selecionado:")
             df_arquivo_selecionado = df_indice[df_indice['arquivo_fonte'] == informativo_selecionado.replace('.pdf', '.docx')]
@@ -246,7 +250,7 @@ if pagina_selecionada == "Navegador de Informativos":
         if not st.session_state.df_filtrado.empty:
             df_final = st.session_state.df_filtrado
             
-            # Ordenação
+            # --- ORDENAÇÃO (RESTAURADA) ---
             sort_options = ["Padrão (Disciplina, Assunto)"]
             info_sel, orgao_sel = st.session_state.get('filtros_ativos', ("Nenhum", "Todos"))
             if info_sel == "Nenhum":
@@ -289,7 +293,7 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     # --- ABA STF ---
     with tab_stf:
         if st.session_state.data_needs_refresh:
-            st.toast("Dados atualizados com sucesso! Recarregando...", icon="✅")
+            st.toast("Dados atualizados com sucesso!", icon="✅")
             st.session_state.data_needs_refresh = False
             
         df_stf = carregar_dados_stf()
@@ -314,7 +318,7 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                      st.session_state.page_stf_top = 1
                      st.session_state.page_stf_bottom = 1
             
-            # Ordenação (Alterada para TEMA Descendente)
+            # Ordenação por TEMA (Descendente)
             df_resultado_stf = df_resultado_stf.sort_values(by='Tema', ascending=False)
 
             # Paginação
@@ -333,14 +337,15 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 for _, row in df_pagina_stf.iterrows():
                     ramo_atual = row.get('Ramo do Direito', 'Não Classificado')
                     
+                    # Layout: Tema + Ramo | Título | Tese visíveis
                     st.markdown(f"#### Tema {row.get('Tema', 'N/A')} :blue-background[{ramo_atual}]")
                     st.markdown(f"**Título:** {row.get('Título', 'N/A')}")
+                    st.markdown(f"**Tese:** {row.get('Tese', 'Pendente')}")
                     
                     with st.expander("Ver detalhes / Editar Classificação"):
-                        st.markdown(f"**Tese:** {row.get('Tese', 'N/A')}")
                         st.markdown(f"**Situação:** {row.get('Situação do Tema', '-')}")
                         st.markdown(f"**Leading Case:** {row.get('Leading Case', '-')}")
-                        st.markdown(f"**Data Julgamento:** {row.get('Data do Julgamento', '-')}")
+                        st.markdown(f"**Julgamento:** {row.get('Data do Julgamento', '-')}")
                         
                         # ÁREA DE ADMINISTRAÇÃO
                         if is_admin:
@@ -398,7 +403,7 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 st.session_state.page_stj_top = 1
                 st.session_state.page_stj_bottom = 1
             
-            # Ordenação (Alterada para TEMA Descendente)
+            # Ordenação por TEMA (Descendente)
             df_resultado_stj = df_resultado_stj.sort_values(by='Tema', ascending=False)
             
             total_items_stj = len(df_resultado_stj)
@@ -413,11 +418,10 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             st.divider()
 
             if not df_pagina_stj.empty:
-                # Layout Unificado com STF (Sem GroupBy de Ramo)
                 for _, row in df_pagina_stj.iterrows():
                     ramo = row.get('Ramo do direito', 'N/A')
-                    st.markdown(f"#### Tema {row.get('Tema')} :blue-background[{ramo}]")
-                    st.markdown(f"**Tese Firmada:** {row.get('Tese Firmada', 'N/A')}")
+                    st.markdown(f"#### Tema {row['Tema']} :blue-background[{ramo}]")
+                    st.markdown(f"**Tese Firmada:** {row.get('Tese Firmada', '-')}")
                     
                     with st.expander("Ver Detalhes"):
                         st.write(f"**Processo:** {row.get('Processo')}")
