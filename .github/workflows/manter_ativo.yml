@@ -1,0 +1,30 @@
+name: Manter Supabase Ativo
+
+on:
+  schedule:
+    # Roda todos os dias às 08:00 UTC (ajuste se quiser)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Permite rodar manualmente clicando num botão para testar
+
+jobs:
+  ping_database:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v3
+
+      - name: Configurar o Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Instalar bibliotecas necessárias
+        run: |
+          pip install sqlalchemy psycopg2-binary
+
+      - name: Executar script de Ping
+        env:
+          # Aqui ele pega a senha que vamos configurar no próximo passo
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+        run: python keep_alive.py
