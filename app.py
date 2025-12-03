@@ -9,7 +9,7 @@ ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
-SENHA_ADMIN = "admin123"
+SENHA_ADMIN = "060147mae"
 
 # Lista completa de Ramos para edição
 LISTA_RAMOS_COMPLETA = sorted([
