@@ -8,10 +8,11 @@ import urllib.parse
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
-# --- SENHA DE ADMINISTRAÇÃO (Novo) ---
-SENHA_ADMIN = "admin123"  # Altere para sua senha desejada
+# --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
+# Defina sua senha aqui
+SENHA_ADMIN = "admin123"
 
-# Lista para edição (Novo)
+# Lista completa de Ramos para o menu de edição
 LISTA_RAMOS_COMPLETA = sorted([
     "Direito Administrativo", "Direito Ambiental", "Direito Civil", 
     "Direito Constitucional", "Direito do Consumidor", "Direito do Trabalho", 
@@ -21,20 +22,27 @@ LISTA_RAMOS_COMPLETA = sorted([
     "Direito Processual Penal", "Direito Tributário", "ECA", "Outros"
 ])
 
-# --- 2. INICIALIZAÇÃO DO ESTADO DA SESSÃO (Mesclado) ---
-if 'df_filtrado' not in st.session_state: st.session_state.df_filtrado = pd.DataFrame()
-if 'titulo_resultados' not in st.session_state: st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
-if 'filtros_ativos' not in st.session_state: st.session_state.filtros_ativos = ("Nenhum", "Todos")
-# Paginação Informativos
+# --- 2. INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
+if 'df_filtrado' not in st.session_state:
+    st.session_state.df_filtrado = pd.DataFrame()
+if 'titulo_resultados' not in st.session_state:
+    st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
+if 'filtros_ativos' not in st.session_state:
+    st.session_state.filtros_ativos = ("Nenhum", "Todos")
+
+# Paginação (Informativos)
 if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
 if 'page_informativos_bottom' not in st.session_state: st.session_state.page_informativos_bottom = 1
-# Paginação STF/STJ
+
+# Paginação (STF/STJ)
 if 'page_stf_top' not in st.session_state: st.session_state.page_stf_top = 1
 if 'page_stf_bottom' not in st.session_state: st.session_state.page_stf_bottom = 1
 if 'page_stj_top' not in st.session_state: st.session_state.page_stj_top = 1
 if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom = 1
-# Controle de Refresh (Novo)
+
+# Controle de Atualização (Admin)
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
+
 
 # --- FUNÇÃO DE CALLBACK PARA SINCRONIZAR PAGINAÇÃO ---
 def sync_page_widgets(source_key, target_key):
@@ -53,18 +61,18 @@ def init_connection():
 
 engine = init_connection()
 
-# --- FUNÇÃO DE UPDATE (Novo - Admin) ---
+# --- FUNÇÃO DE UPDATE (ADMIN) ---
 def atualizar_ramo_stf(tema_id, novo_ramo):
     if engine is None: return False
     try:
         with engine.begin() as conn:
             stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo WHERE "Tema" = :tema')
             conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
-        st.cache_data.clear()
+        st.cache_data.clear() # Limpa cache para refletir a mudança
         st.session_state.data_needs_refresh = True
         return True
     except Exception as e:
-        st.error(f"Erro ao atualizar: {e}")
+        st.error(f"Erro ao atualizar banco: {e}")
         return False
 
 # --- 4. FUNÇÕES DE CARREGAMENTO DE DADOS ---
@@ -90,9 +98,11 @@ def carregar_dados_stf():
         df = pd.read_sql_query('SELECT * FROM temas_stf', engine)
         df.columns = [col.replace('"', '') for col in df.columns]
         
-        # Garante a coluna Ramo do Direito (Novo)
-        if 'Ramo do Direito' not in df.columns: df['Ramo do Direito'] = 'Não Classificado'
-        else: df['Ramo do Direito'] = df['Ramo do Direito'].fillna('Não Classificado')
+        # Garante a coluna Ramo do Direito
+        if 'Ramo do Direito' not in df.columns: 
+            df['Ramo do Direito'] = 'Não Classificado'
+        else:
+            df['Ramo do Direito'] = df['Ramo do Direito'].fillna('Não Classificado')
 
         colunas_stf_busca = ["Tema", "Tese", "Leading Case", "Título", "Situação do Tema", "Ramo do Direito"]
         for col in colunas_stf_busca:
@@ -149,10 +159,11 @@ def exibir_item_stj_agrupado(row):
     st.markdown("---")
 
 # --- 5. INTERFACE PRINCIPAL ---
+
+# Sidebar: Menu e Login
 st.sidebar.title("Menu de Navegação")
 pagina_selecionada = st.sidebar.radio("Escolha a ferramenta:", ["Navegador de Informativos", "Pesquisa de Temas (STF/STJ)", "Súmulas"])
 
-# --- ÁREA DE LOGIN (Novo) ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("🔒 **Área Administrativa**")
 senha_input = st.sidebar.text_input("Senha Admin", type="password")
@@ -160,7 +171,8 @@ is_admin = senha_input == SENHA_ADMIN
 if is_admin:
     st.sidebar.success("Modo Edição Ativado ✅")
 
-# === PÁGINA: INFORMATIVOS (Mantido Original Completo) ===
+
+# === PÁGINA 1: INFORMATIVOS (Lógica Original Completa) ===
 if pagina_selecionada == "Navegador de Informativos":
     st.title("📚 Navegador de Índices Jurídicos")
     df_indice = carregar_dados_informativos()
@@ -282,14 +294,16 @@ if pagina_selecionada == "Navegador de Informativos":
             if total_pages > 1:
                 st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_informativos_bottom', 'page_informativos_top'))
 
-# === PÁGINA: STF/STJ (Com Admin e Edição Integrados) ===
+
+# === PÁGINA 2: STF/STJ (Com Admin e Visualização Corrigida) ===
 elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
     st.title("🔎 Pesquisa de Temas de Repercussão Geral e Repetitivos")
     tab_stf, tab_stj = st.tabs(["**STF - Repercussão Geral**", "**STJ - Temas Repetitivos**"])
 
+    # --- ABA STF ---
     with tab_stf:
         if st.session_state.data_needs_refresh:
-            st.success("Dados atualizados com sucesso! Recarregando...")
+            st.toast("Dados atualizados com sucesso! Recarregando...", icon="✅")
             st.session_state.data_needs_refresh = False
             
         df_stf = carregar_dados_stf()
@@ -297,19 +311,17 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
         if df_stf is not None:
             st.header("Pesquisar Temas do STF")
             
-            # --- FILTROS STF (Novo) ---
-            col_ramo, col_busca = st.columns([1, 2])
-            with col_ramo:
+            c1, c2 = st.columns([1, 2])
+            with c1:
                 ramos_disponiveis_stf = ["Todos"] + sorted(df_stf['Ramo do Direito'].astype(str).unique())
                 ramo_selecionado_stf = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis_stf, key="ramo_stf_filter")
-            with col_busca:
+            with c2:
                 termo_busca_stf = st.text_input("Buscar por (Ctrl+F):", key="busca_stf")
 
-            # Aplicação dos Filtros
+            # Filtros
             df_resultado_stf = df_stf.copy()
             if ramo_selecionado_stf != "Todos":
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['Ramo do Direito'] == ramo_selecionado_stf]
-
             if termo_busca_stf:
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['busca'].str.contains(termo_busca_stf.lower(), na=False)]
                 if 'page_stf_top' in st.session_state:
@@ -317,9 +329,9 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                      st.session_state.page_stf_bottom = 1
             
             # Ordenação
-            if 'Ramo do Direito' in df_resultado_stf.columns:
-                 df_resultado_stf = df_resultado_stf.sort_values(by=['Ramo do Direito', 'Tema'], ascending=[True, False])
+            df_resultado_stf = df_resultado_stf.sort_values(by=['Ramo do Direito', 'Tema'], ascending=[True, False])
 
+            # Paginação
             total_items_stf = len(df_resultado_stf)
             total_pages_stf = math.ceil(total_items_stf / ITEMS_PER_PAGE) if total_items_stf > 0 else 1
 
@@ -333,34 +345,33 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             
             if not df_pagina_stf.empty:
                 for _, row in df_pagina_stf.iterrows():
-                    # Cabeçalho do Card
                     ramo_atual = row.get('Ramo do Direito', 'Não Classificado')
-                    st.markdown(f"#### Tema {row.get('Tema', 'N/A')} <span style='font-size:0.7em; background-color:#f0f2f6; padding:2px 6px; border-radius:4px;'>{ramo_atual}</span>", unsafe_allow_html=True)
+                    
+                    # --- CORREÇÃO VISUAL: Uso de :blue-background[...] para Modo Noturno ---
+                    st.markdown(f"#### Tema {row.get('Tema', 'N/A')} :blue-background[{ramo_atual}]")
                     
                     st.markdown(f"**Título:** {row.get('Título', 'N/A')}")
-                    st.markdown(f"**Tese:** {row.get('Tese', 'N/A')}")
                     
-                    with st.expander("Ver detalhes e Editar Classificação"):
-                        # Detalhes
-                        colunas_todas_stf = ["Leading Case", "Situação do Tema", "Data do Julgamento", "Data da Tese"]
-                        for col in colunas_todas_stf:
-                            if col in row and pd.notna(row[col]):
-                                st.markdown(f"**{col}:** {row[col]}")
+                    with st.expander("Ver detalhes / Editar Classificação"):
+                        st.markdown(f"**Tese:** {row.get('Tese', 'N/A')}")
+                        st.markdown(f"**Situação:** {row.get('Situação do Tema', '-')}")
+                        st.markdown(f"**Leading Case:** {row.get('Leading Case', '-')}")
+                        st.markdown(f"**Data Julgamento:** {row.get('Data do Julgamento', '-')}")
                         
                         # ÁREA DE ADMINISTRAÇÃO (Só aparece se logado)
                         if is_admin:
-                            st.markdown("---")
-                            st.markdown("##### 🛠️ Admin: Alterar Ramo")
+                            st.divider()
+                            st.write("🛠️ **Admin: Alterar Classificação**")
                             with st.form(key=f"form_stf_{row['Tema']}"):
                                 c_edit1, c_edit2 = st.columns([3, 1])
                                 idx_inicial = 0
                                 if ramo_atual in LISTA_RAMOS_COMPLETA:
                                     idx_inicial = LISTA_RAMOS_COMPLETA.index(ramo_atual)
                                 
-                                novo_ramo_sel = c_edit1.selectbox("Selecione a classificação:", 
+                                novo_ramo_sel = c_edit1.selectbox("Nova classificação:", 
                                                                 options=LISTA_RAMOS_COMPLETA, 
                                                                 index=idx_inicial)
-                                c_edit2.write("")
+                                c_edit2.write("") 
                                 c_edit2.write("")
                                 if c_edit2.form_submit_button("Salvar"):
                                     if novo_ramo_sel != ramo_atual:
@@ -378,15 +389,18 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
         else:
             st.error("Não foi possível carregar os dados do STF.")
 
+    # --- ABA STJ ---
     with tab_stj:
         df_stj = carregar_dados_stj()
         if df_stj is not None:
             st.header("Pesquisar Temas do STJ")
+            c1, c2 = st.columns([1, 2])
             ramos_disponiveis = ["Todos"] + sorted(df_stj['Ramo do direito'].dropna().unique())
-            ramo_selecionado = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
-            termo_busca_stj = st.text_input("Buscar por (Ctrl+F):", key="busca_stj")
+            ramo_selecionado = c1.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
+            termo_busca_stj = c2.text_input("Buscar por (Ctrl+F):", key="busca_stj")
             
             df_resultado_stj = df_stj.copy()
+            # Reset paginação se mudar filtro
             if ramo_selecionado != st.session_state.get("ramo_selecionado_anterior", "Todos"):
                 st.session_state.page_stj_top = 1
                 st.session_state.page_stj_bottom = 1
