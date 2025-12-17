@@ -3,6 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 import math
 import urllib.parse
+import streamlit.components.v1 as components  # Importação necessária para o JavaScript de rolagem
 
 # --- 1. CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
@@ -42,10 +43,23 @@ if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom =
 # Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
+# --- FUNÇÃO DE SINCRONIZAÇÃO E ROLAGEM ---
 def sync_page_widgets(source_key, target_key):
+    """
+    Sincroniza os paginadores e rola para o topo se a mudança vier de baixo.
+    """
     if source_key in st.session_state and target_key in st.session_state:
         if st.session_state[source_key] != st.session_state[target_key]:
-             st.session_state[target_key] = st.session_state[source_key]
+            st.session_state[target_key] = st.session_state[source_key]
+            
+            # Se a mudança veio do paginador de baixo, rola para o topo
+            if "bottom" in source_key:
+                js = """
+                <script>
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                </script>
+                """
+                components.html(js, height=0)
 
 # --- 3. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
@@ -105,6 +119,10 @@ def carregar_dados_stf():
         colunas_stf_busca = ["Tema", "Tese", "Leading Case", "Título", "Situação do Tema", "Ramo do Direito"]
         for col in colunas_stf_busca:
             if col not in df.columns: df[col] = ''
+        
+        # Garante que Tese não seja NaN para filtros
+        df['Tese'] = df['Tese'].fillna('')
+        
         df['busca'] = df[colunas_stf_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
@@ -124,6 +142,11 @@ def carregar_dados_stj():
         colunas_stj_busca = ["Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema", "Questão submetida a julgamento"]
         for col in colunas_stj_busca:
             if col not in df.columns: df[col] = ''
+            
+        # Garante que Tese Firmada não seja NaN para filtros
+        if 'Tese Firmada' not in df.columns: df['Tese Firmada'] = ''
+        df['Tese Firmada'] = df['Tese Firmada'].fillna('')
+            
         df['busca'] = df[colunas_stj_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
@@ -302,17 +325,31 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
         if df_stf is not None:
             st.header("Pesquisar Temas do STF")
             
-            c1, c2 = st.columns([1, 2])
+            # Layout de 3 colunas para incluir o filtro de teses
+            c1, c2, c3 = st.columns([1.5, 1, 2])
             with c1:
                 ramos_disponiveis_stf = ["Todos"] + sorted(df_stf['Ramo do Direito'].astype(str).unique())
                 ramo_selecionado_stf = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis_stf, key="ramo_stf_filter")
             with c2:
+                # Novo campo: Opção Com Tese / Sem Tese
+                opcao_tese_stf = st.radio("Exibir:", ["Com tese", "Sem teses", "Todos"], index=0, key="filtro_tese_stf")
+            with c3:
                 termo_busca_stf = st.text_input("Buscar por (Ctrl+F):", key="busca_stf")
 
-            # Filtros
+            # Aplicação dos Filtros
             df_resultado_stf = df_stf.copy()
+            
+            # 1. Filtro de Ramo
             if ramo_selecionado_stf != "Todos":
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['Ramo do Direito'] == ramo_selecionado_stf]
+            
+            # 2. Filtro de Tese (Lógica)
+            if opcao_tese_stf == "Com tese":
+                df_resultado_stf = df_resultado_stf[df_resultado_stf['Tese'].str.strip() != '']
+            elif opcao_tese_stf == "Sem teses":
+                df_resultado_stf = df_resultado_stf[df_resultado_stf['Tese'].str.strip() == '']
+            
+            # 3. Filtro de Busca Texto
             if termo_busca_stf:
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['busca'].str.contains(termo_busca_stf.lower(), na=False)]
                 if 'page_stf_top' in st.session_state:
@@ -383,10 +420,16 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
         df_stj = carregar_dados_stj()
         if df_stj is not None:
             st.header("Pesquisar Temas do STJ")
-            c1, c2 = st.columns([1, 2])
-            ramos_disponiveis = ["Todos"] + sorted(df_stj['Ramo do direito'].dropna().unique())
-            ramo_selecionado = c1.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
-            termo_busca_stj = c2.text_input("Buscar por (Ctrl+F):", key="busca_stj")
+            
+            c1, c2, c3 = st.columns([1.5, 1, 2])
+            with c1:
+                ramos_disponiveis = ["Todos"] + sorted(df_stj['Ramo do direito'].dropna().unique())
+                ramo_selecionado = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
+            with c2:
+                # Novo campo: Opção Com Tese / Sem Tese
+                opcao_tese_stj = st.radio("Exibir:", ["Com tese", "Sem teses", "Todos"], index=0, key="filtro_tese_stj")
+            with c3:
+                termo_busca_stj = st.text_input("Buscar por (Ctrl+F):", key="busca_stj")
             
             df_resultado_stj = df_stj.copy()
             # Reset paginação se mudar filtro
@@ -395,9 +438,17 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 st.session_state.page_stj_bottom = 1
             st.session_state.ramo_selecionado_anterior = ramo_selecionado
 
+            # 1. Filtro Ramo
             if ramo_selecionado != "Todos":
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['Ramo do direito'] == ramo_selecionado]
 
+            # 2. Filtro Tese (Lógica baseada em 'Tese Firmada')
+            if opcao_tese_stj == "Com tese":
+                df_resultado_stj = df_resultado_stj[df_resultado_stj['Tese Firmada'].str.strip() != '']
+            elif opcao_tese_stj == "Sem teses":
+                df_resultado_stj = df_resultado_stj[df_resultado_stj['Tese Firmada'].str.strip() == '']
+
+            # 3. Filtro Busca
             if termo_busca_stj:
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['busca'].str.contains(termo_busca_stj.lower(), na=False)]
                 st.session_state.page_stj_top = 1
