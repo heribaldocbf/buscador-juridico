@@ -4,33 +4,40 @@ from sqlalchemy import create_engine, text
 import math
 import urllib.parse
 import streamlit.components.v1 as components
-import time
 
 # --- 1. CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
-# Criar um container vazio NO TOPO ABSOLUTO para injetar o script de scroll
-scroll_placeholder = st.empty()
+# --- LÓGICA DE ROLAGEM AUTOMÁTICA (CORREÇÃO DEFINITIVA) ---
+# Inicializa contador para garantir que o Streamlit perceba a mudança e execute o JS
+if 'scroll_counter' not in st.session_state:
+    st.session_state.scroll_counter = 0
 
-# --- LÓGICA DE ROLAGEM (AGRESSIVA) ---
-# Se a flag de scroll estiver ativa, injeta o JS e desliga a flag
-if st.session_state.get('trigger_scroll_top', False):
-    # O uso de time.time() no id do script força o Streamlit a reexecutar o JS toda vez
-    js = f"""
+# Se o contador > 0 (acionado pelo paginador de baixo), injeta o JavaScript
+if st.session_state.scroll_counter > 0:
+    # Este script busca especificamente o container de rolagem do Streamlit (stAppViewContainer)
+    # e força o topo. O ID no final garante que o script rode a cada clique.
+    js_scroll = f"""
     <script>
-        var body = window.parent.document.querySelector(".stApp");
-        if (body) {{
-            body.scrollTop = 0; // Força bruta para o topo da div do Streamlit
+        // Tenta encontrar o container principal de rolagem do Streamlit
+        var scroller = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+        if (scroller) {{
+            scroller.scrollTop = 0;
         }}
-        window.parent.scrollTo(0, 0); // Força bruta para a janela inteira
+        
+        // Fallback: Tenta rolar a janela principal (caso o layout mude)
+        window.parent.scrollTo(0, 0);
+        
+        // Fallback 2: Tenta encontrar a classe main
+        var main = window.parent.document.querySelector('section.main');
+        if (main) {{
+            main.scrollTop = 0;
+        }}
+        console.log("Scroll forced: {st.session_state.scroll_counter}");
     </script>
-    <div id="force_scroll_{int(time.time())}"></div>
     """
-    with scroll_placeholder:
-        components.html(js, height=0)
-    # Desliga o gatilho para não ficar subindo se o usuário interagir com outras coisas
-    st.session_state.trigger_scroll_top = False
+    components.html(js_scroll, height=0)
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
@@ -52,8 +59,6 @@ if 'titulo_resultados' not in st.session_state:
     st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
 if 'filtros_ativos' not in st.session_state:
     st.session_state.filtros_ativos = ("Nenhum", "Todos")
-if 'trigger_scroll_top' not in st.session_state:
-    st.session_state.trigger_scroll_top = False
 
 # Paginação - Informativos
 if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
@@ -68,19 +73,20 @@ if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom =
 # Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
-# --- FUNÇÃO DE SINCRONIZAÇÃO (GATILHO DE SCROLL) ---
+# --- FUNÇÃO DE SINCRONIZAÇÃO E GATILHO ---
 def sync_page_widgets(source_key, target_key):
     """
-    Sincroniza os paginadores. Se a origem for o paginador de BAIXO (bottom),
-    ativa o gatilho para rolar a tela para cima.
+    Sincroniza os paginadores (topo e fundo).
+    Se a mudança vier do paginador de BAIXO ("bottom"), incrementa o contador para forçar a subida.
     """
     if source_key in st.session_state and target_key in st.session_state:
+        # Apenas se o valor realmente mudou
         if st.session_state[source_key] != st.session_state[target_key]:
             st.session_state[target_key] = st.session_state[source_key]
             
-            # Se mudou pelo botão de baixo, ATIVA A SUBIDA
+            # Se a interação veio do componente de baixo, ativa o scroll
             if "bottom" in source_key:
-                st.session_state.trigger_scroll_top = True
+                st.session_state.scroll_counter += 1
 
 # --- 3. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
