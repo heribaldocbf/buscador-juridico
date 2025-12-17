@@ -3,11 +3,31 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 import math
 import urllib.parse
-import streamlit.components.v1 as components  # Importação necessária para o JavaScript de rolagem
+import streamlit.components.v1 as components
 
 # --- 1. CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
+
+# --- LÓGICA DE ROLAGEM AUTOMÁTICA (CORREÇÃO) ---
+# Verifica se há solicitação de scroll pendente
+if 'scroll_requested' not in st.session_state:
+    st.session_state.scroll_requested = False
+
+if st.session_state.scroll_requested:
+    # Script JavaScript aprimorado para rolar a janela pai e o container do Streamlit
+    js_scroll = """
+    <script>
+        var body = window.parent.document.querySelector(".stApp");
+        if (body) {
+            body.scrollTo({ top: 0, behavior: "smooth" });
+        } else {
+            window.parent.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    </script>
+    """
+    components.html(js_scroll, height=0)
+    st.session_state.scroll_requested = False # Reseta o gatilho
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
@@ -43,23 +63,18 @@ if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom =
 # Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
-# --- FUNÇÃO DE SINCRONIZAÇÃO E ROLAGEM ---
+# --- FUNÇÃO DE SINCRONIZAÇÃO (CORRIGIDA) ---
 def sync_page_widgets(source_key, target_key):
     """
-    Sincroniza os paginadores e rola para o topo se a mudança vier de baixo.
+    Sincroniza os paginadores e ativa o gatilho de rolagem se necessário.
     """
     if source_key in st.session_state and target_key in st.session_state:
         if st.session_state[source_key] != st.session_state[target_key]:
             st.session_state[target_key] = st.session_state[source_key]
             
-            # Se a mudança veio do paginador de baixo, rola para o topo
+            # Se a mudança veio do paginador de baixo, ativa a flag para rolar na próxima renderização
             if "bottom" in source_key:
-                js = """
-                <script>
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                </script>
-                """
-                components.html(js, height=0)
+                st.session_state.scroll_requested = True
 
 # --- 3. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
