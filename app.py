@@ -4,31 +4,33 @@ from sqlalchemy import create_engine, text
 import math
 import urllib.parse
 import streamlit.components.v1 as components
+import time
 
 # --- 1. CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
-# --- LÓGICA DE ROLAGEM AUTOMÁTICA (CORREÇÃO DEFINITIVA) ---
-# Inicializa um contador. O truque é alterar o ID do script a cada clique.
-if 'scroll_counter' not in st.session_state:
-    st.session_state.scroll_counter = 0
+# Criar um container vazio NO TOPO ABSOLUTO para injetar o script de scroll
+scroll_placeholder = st.empty()
 
-# Se o contador for maior que 0, injeta o JS com o ID novo para forçar a execução
-if st.session_state.scroll_counter > 0:
-    # O valor do counter dentro do script garante que o Streamlit re-execute o JS
-    js_scroll = f"""
+# --- LÓGICA DE ROLAGEM (AGRESSIVA) ---
+# Se a flag de scroll estiver ativa, injeta o JS e desliga a flag
+if st.session_state.get('trigger_scroll_top', False):
+    # O uso de time.time() no id do script força o Streamlit a reexecutar o JS toda vez
+    js = f"""
     <script>
-        // Scroll ID: {st.session_state.scroll_counter}
         var body = window.parent.document.querySelector(".stApp");
         if (body) {{
-            body.scrollTo({{ top: 0, behavior: "smooth" }});
-        }} else {{
-            window.parent.scrollTo({{ top: 0, behavior: "smooth" }});
+            body.scrollTop = 0; // Força bruta para o topo da div do Streamlit
         }}
+        window.parent.scrollTo(0, 0); // Força bruta para a janela inteira
     </script>
+    <div id="force_scroll_{int(time.time())}"></div>
     """
-    components.html(js_scroll, height=0)
+    with scroll_placeholder:
+        components.html(js, height=0)
+    # Desliga o gatilho para não ficar subindo se o usuário interagir com outras coisas
+    st.session_state.trigger_scroll_top = False
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
@@ -50,6 +52,8 @@ if 'titulo_resultados' not in st.session_state:
     st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
 if 'filtros_ativos' not in st.session_state:
     st.session_state.filtros_ativos = ("Nenhum", "Todos")
+if 'trigger_scroll_top' not in st.session_state:
+    st.session_state.trigger_scroll_top = False
 
 # Paginação - Informativos
 if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
@@ -64,19 +68,19 @@ if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom =
 # Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
-# --- FUNÇÃO DE SINCRONIZAÇÃO (CORRIGIDA COM CONTADOR) ---
+# --- FUNÇÃO DE SINCRONIZAÇÃO (GATILHO DE SCROLL) ---
 def sync_page_widgets(source_key, target_key):
     """
-    Sincroniza os paginadores e incrementa o contador para forçar o scroll.
+    Sincroniza os paginadores. Se a origem for o paginador de BAIXO (bottom),
+    ativa o gatilho para rolar a tela para cima.
     """
     if source_key in st.session_state and target_key in st.session_state:
         if st.session_state[source_key] != st.session_state[target_key]:
             st.session_state[target_key] = st.session_state[source_key]
             
-            # Se a mudança veio do paginador de baixo (bottom), incrementa o contador
-            # Isso muda o hash do componente HTML e força o Streamlit a rodar o JS novamente
+            # Se mudou pelo botão de baixo, ATIVA A SUBIDA
             if "bottom" in source_key:
-                st.session_state.scroll_counter += 1
+                st.session_state.trigger_scroll_top = True
 
 # --- 3. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
