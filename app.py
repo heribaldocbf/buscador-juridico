@@ -41,14 +41,22 @@ if st.session_state.trigger_scroll_top:
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
 
-# Lista completa de Ramos para edição
+# Lista completa de Ramos (Sincronizada com o STJ/Robô)
+# Obs: O formato Title Case (letras maiúsculas em "Do", "E") é como o Python gera automaticamente.
 LISTA_RAMOS_COMPLETA = sorted([
-    "Direito Administrativo", "Direito Ambiental", "Direito Civil", 
-    "Direito Constitucional", "Direito do Consumidor", "Direito do Trabalho", 
-    "Direito Eleitoral", "Direito Empresarial", "Direito Financeiro", 
-    "Direito Internacional", "Direito Notarial e Registral", "Direito Penal", 
-    "Direito Previdenciário", "Direito Processual Civil", 
-    "Direito Processual Penal", "Direito Tributário", "ECA", "Outros"
+    "Direito Administrativo",
+    "Direito Ambiental",
+    "Direito Civil",
+    "Direito Comercial",
+    "Direito Do Consumidor",
+    "Direito Do Trabalho E Processual Trabalhista",
+    "Direito Penal",
+    "Direito Previdenciário",
+    "Direito Processual Civil E Do Trabalho",
+    "Direito Processual Penal",
+    "Direito Processual Penal Militar",
+    "Direito Tributário",
+    "Outros"
 ])
 
 # --- 3. INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
