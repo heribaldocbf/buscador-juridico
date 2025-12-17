@@ -9,25 +9,26 @@ import streamlit.components.v1 as components
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
-# --- LÓGICA DE ROLAGEM AUTOMÁTICA (CORREÇÃO) ---
-# Verifica se há solicitação de scroll pendente
-if 'scroll_requested' not in st.session_state:
-    st.session_state.scroll_requested = False
+# --- LÓGICA DE ROLAGEM AUTOMÁTICA (CORREÇÃO DEFINITIVA) ---
+# Inicializa um contador. O truque é alterar o ID do script a cada clique.
+if 'scroll_counter' not in st.session_state:
+    st.session_state.scroll_counter = 0
 
-if st.session_state.scroll_requested:
-    # Script JavaScript aprimorado para rolar a janela pai e o container do Streamlit
-    js_scroll = """
+# Se o contador for maior que 0, injeta o JS com o ID novo para forçar a execução
+if st.session_state.scroll_counter > 0:
+    # O valor do counter dentro do script garante que o Streamlit re-execute o JS
+    js_scroll = f"""
     <script>
+        // Scroll ID: {st.session_state.scroll_counter}
         var body = window.parent.document.querySelector(".stApp");
-        if (body) {
-            body.scrollTo({ top: 0, behavior: "smooth" });
-        } else {
-            window.parent.scrollTo({ top: 0, behavior: "smooth" });
-        }
+        if (body) {{
+            body.scrollTo({{ top: 0, behavior: "smooth" }});
+        }} else {{
+            window.parent.scrollTo({{ top: 0, behavior: "smooth" }});
+        }}
     </script>
     """
     components.html(js_scroll, height=0)
-    st.session_state.scroll_requested = False # Reseta o gatilho
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
@@ -63,18 +64,19 @@ if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom =
 # Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
-# --- FUNÇÃO DE SINCRONIZAÇÃO (CORRIGIDA) ---
+# --- FUNÇÃO DE SINCRONIZAÇÃO (CORRIGIDA COM CONTADOR) ---
 def sync_page_widgets(source_key, target_key):
     """
-    Sincroniza os paginadores e ativa o gatilho de rolagem se necessário.
+    Sincroniza os paginadores e incrementa o contador para forçar o scroll.
     """
     if source_key in st.session_state and target_key in st.session_state:
         if st.session_state[source_key] != st.session_state[target_key]:
             st.session_state[target_key] = st.session_state[source_key]
             
-            # Se a mudança veio do paginador de baixo, ativa a flag para rolar na próxima renderização
+            # Se a mudança veio do paginador de baixo (bottom), incrementa o contador
+            # Isso muda o hash do componente HTML e força o Streamlit a rodar o JS novamente
             if "bottom" in source_key:
-                st.session_state.scroll_requested = True
+                st.session_state.scroll_counter += 1
 
 # --- 3. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
