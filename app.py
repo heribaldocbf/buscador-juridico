@@ -4,40 +4,39 @@ from sqlalchemy import create_engine, text
 import math
 import urllib.parse
 import streamlit.components.v1 as components
+import time
 
 # --- 1. CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
 st.set_page_config(page_title="Hub Jurídico", page_icon="⚖️", layout="wide")
 
-# --- LÓGICA DE ROLAGEM AUTOMÁTICA (CORREÇÃO DEFINITIVA) ---
-# Inicializa contador para garantir que o Streamlit perceba a mudança e execute o JS
-if 'scroll_counter' not in st.session_state:
-    st.session_state.scroll_counter = 0
+# ==============================================================================
+# ⚓ 1. ÂNCORA INVISÍVEL NO TOPO (O "ALVO" DA TECLA HOME)
+# ==============================================================================
+st.markdown('<div id="topo_da_pagina"></div>', unsafe_allow_html=True)
 
-# Se o contador > 0 (acionado pelo paginador de baixo), injeta o JavaScript
-if st.session_state.scroll_counter > 0:
-    # Este script busca especificamente o container de rolagem do Streamlit (stAppViewContainer)
-    # e força o topo. O ID no final garante que o script rode a cada clique.
-    js_scroll = f"""
+# --- 2. LÓGICA DE SALTO PARA O TOPO (SIMULAÇÃO DA TECLA HOME) ---
+if 'trigger_scroll_top' not in st.session_state:
+    st.session_state.trigger_scroll_top = False
+
+if st.session_state.trigger_scroll_top:
+    # Este script manda o navegador "olhar" para a div #topo_da_pagina
+    # O timeout garante que o Streamlit termine de desenhar a tabela antes de pular
+    js = f"""
     <script>
-        // Tenta encontrar o container principal de rolagem do Streamlit
-        var scroller = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-        if (scroller) {{
-            scroller.scrollTop = 0;
-        }}
-        
-        // Fallback: Tenta rolar a janela principal (caso o layout mude)
-        window.parent.scrollTo(0, 0);
-        
-        // Fallback 2: Tenta encontrar a classe main
-        var main = window.parent.document.querySelector('section.main');
-        if (main) {{
-            main.scrollTop = 0;
-        }}
-        console.log("Scroll forced: {st.session_state.scroll_counter}");
+        setTimeout(function() {{
+            var topDiv = window.parent.document.getElementById("topo_da_pagina");
+            if (topDiv) {{
+                topDiv.scrollIntoView({{block: "start", behavior: "auto"}});
+            }}
+            // Reforço: tenta rolar a janela principal também
+            window.parent.scrollTo(0, 0);
+        }}, 100); 
     </script>
+    <div id="scroll_trigger_{int(time.time())}"></div>
     """
-    components.html(js_scroll, height=0)
+    components.html(js, height=0)
+    st.session_state.trigger_scroll_top = False
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
@@ -52,7 +51,7 @@ LISTA_RAMOS_COMPLETA = sorted([
     "Direito Processual Penal", "Direito Tributário", "ECA", "Outros"
 ])
 
-# --- 2. INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
+# --- 3. INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
 if 'df_filtrado' not in st.session_state:
     st.session_state.df_filtrado = pd.DataFrame()
 if 'titulo_resultados' not in st.session_state:
@@ -73,22 +72,20 @@ if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom =
 # Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
-# --- FUNÇÃO DE SINCRONIZAÇÃO E GATILHO ---
+# --- 4. FUNÇÃO DE SINCRONIZAÇÃO (ATIVADOR DO SALTO) ---
 def sync_page_widgets(source_key, target_key):
     """
-    Sincroniza os paginadores (topo e fundo).
-    Se a mudança vier do paginador de BAIXO ("bottom"), incrementa o contador para forçar a subida.
+    Se o usuário mexer no paginador de baixo, ativamos o gatilho 'Home'.
     """
     if source_key in st.session_state and target_key in st.session_state:
-        # Apenas se o valor realmente mudou
         if st.session_state[source_key] != st.session_state[target_key]:
             st.session_state[target_key] = st.session_state[source_key]
             
-            # Se a interação veio do componente de baixo, ativa o scroll
+            # Se a mudança veio de baixo, ativa o scroll para a âncora
             if "bottom" in source_key:
-                st.session_state.scroll_counter += 1
+                st.session_state.trigger_scroll_top = True
 
-# --- 3. CONEXÃO COM O BANCO DE DADOS ---
+# --- 5. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
 def init_connection():
     try:
@@ -113,7 +110,7 @@ def atualizar_ramo_stf(tema_id, novo_ramo):
         st.error(f"Erro ao atualizar banco: {e}")
         return False
 
-# --- 4. FUNÇÕES DE CARREGAMENTO DE DADOS ---
+# --- 6. FUNÇÕES DE CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=600)
 def carregar_dados_informativos():
     if engine is None: return None
@@ -200,7 +197,7 @@ def exibir_item_informativo_agrupado(row):
     except Exception as e:
         st.error(f"Erro ao exibir item: {e}")
 
-# --- 5. INTERFACE PRINCIPAL ---
+# --- 7. INTERFACE PRINCIPAL ---
 st.sidebar.title("Menu de Navegação")
 pagina_selecionada = st.sidebar.radio("Escolha a ferramenta:", ["Navegador de Informativos", "Pesquisa de Temas (STF/STJ)", "Súmulas"])
 
