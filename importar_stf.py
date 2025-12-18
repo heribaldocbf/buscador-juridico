@@ -180,7 +180,7 @@ print("Gerando classificação sugerida para todos os itens...")
 df_stf['Ramo do Direito'] = classificar_hibrido(df_stf, model, nomes_ramos, embeddings_ramos)
 
 # ==============================================================================
-# 🛡️ D. O PULO DO GATO: PROTEÇÃO DE EDIÇÕES MANUAIS
+# 🛡️ D. O PULO DO GATO: PROTEÇÃO DE EDIÇÕES MANUAIS E DATA DE ALTERAÇÃO
 # ==============================================================================
 print("\n--- 4. Verificando edições manuais no Banco de Dados ---")
 
@@ -191,17 +191,23 @@ try:
     if not df_banco_atual.empty:
         print(f"Banco atual tem {len(df_banco_atual)} registros. Preservando edições...")
         
-        # Cria um dicionário {TEMA: RAMO_NO_BANCO}
-        # Garante que Tema seja inteiro para bater certo
+        # Garante int no Tema
         df_banco_atual['Tema'] = pd.to_numeric(df_banco_atual['Tema'], errors='coerce').fillna(0).astype(int)
+        
+        # Mapa de Preservação de Ramo
         mapa_preservacao = dict(zip(df_banco_atual['Tema'], df_banco_atual['Ramo do Direito']))
+        
+        # Mapa de Preservação de Data (se existir a coluna)
+        mapa_datas = {}
+        if 'data_ultima_alteracao' in df_banco_atual.columns:
+            mapa_datas = dict(zip(df_banco_atual['Tema'], df_banco_atual['data_ultima_alteracao']))
         
         # 2. Função que decide qual ramo usar
         def mesclar_inteligente(row):
             try:
                 tema_atual = int(row['Tema'])
             except:
-                return row['Ramo do Direito'] # Se não tiver tema, usa o novo
+                return row['Ramo do Direito'] 
             
             # Se esse tema JÁ EXISTE no banco, usamos o que está no banco (Manual)
             if tema_atual in mapa_preservacao:
@@ -213,20 +219,34 @@ try:
             # Se é tema novo OU o banco estava vazio, usa a classificação nova da IA
             return row['Ramo do Direito']
 
-        # Aplica a mesclagem
+        # 3. Função para recuperar a data da alteração
+        def recuperar_data(row):
+            try:
+                tema_atual = int(row['Tema'])
+                if tema_atual in mapa_datas:
+                    return mapa_datas[tema_atual]
+            except:
+                pass
+            return None # Retorna vazio se for novo ou nunca foi editado
+
+        # Aplica as mesclagens
         df_stf['Ramo do Direito'] = df_stf.apply(mesclar_inteligente, axis=1)
-        print("✅ Mesclagem concluída: Edições manuais antigas foram mantidas.")
+        df_stf['data_ultima_alteracao'] = df_stf.apply(recuperar_data, axis=1)
+        
+        print("✅ Mesclagem concluída: Edições manuais antigas e datas foram mantidas.")
     else:
         print("Banco vazio. Usando 100% das classificações novas.")
+        df_stf['data_ultima_alteracao'] = None # Cria coluna vazia se for a primeira vez
 
 except Exception as e:
     print(f"⚠️ Aviso: Não consegui ler o banco atual (pode ser a primeira execução). Erro: {e}")
+    df_stf['data_ultima_alteracao'] = None # Garante que a coluna exista para não dar erro no to_sql
 
 
 # E. Salvar
 print("\n--- Salvando no Banco ---")
 try:
-    cols_possiveis = ['Tema', 'Título', 'Descrição', 'Tese', 'Assuntos', 'Ramo do Direito', 'Leading Case', 'Situação do Tema', 'Data do Julgamento']
+    cols_possiveis = ['Tema', 'Título', 'Descrição', 'Tese', 'Assuntos', 'Ramo do Direito', 'Leading Case', 'Situação do Tema', 'Data do Julgamento', 'data_ultima_alteracao']
     cols_finais = [c for c in cols_possiveis if c in df_stf.columns]
     
     df_final = df_stf[cols_finais].copy()
@@ -234,6 +254,9 @@ try:
     for col in df_final.columns:
         if col == 'Tema':
             df_final[col] = pd.to_numeric(df_final[col], errors='coerce').fillna(0).apply(lambda x: int(x))
+        elif col == 'data_ultima_alteracao':
+            # Mantém formato de data/hora ou Nulo, não converte pra string forçada
+            df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
         else:
             df_final[col] = df_final[col].astype(str).replace({'nan': '', 'None': '', '<NA>': ''})
 
@@ -242,6 +265,3 @@ try:
 
 except Exception as e:
     print(f"❌ Erro ao salvar: {e}")
-
-# Se o arquivo do STF ficar gigante no futuro (tipo 50.000 linhas) e começar a demorar muito, me avise. Podemos alterar o código para a IA ignorar o que já está no banco e calcular apenas os Temas Novos.
-#Mas, por enquanto, do jeito que está é mais seguro, pois garante que qualquer melhoria que você faça no código (novas regras) seja aplicada retroativamente em tudo o que não foi travado manualmente.

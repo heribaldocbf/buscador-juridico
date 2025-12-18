@@ -109,7 +109,8 @@ def atualizar_ramo_stf(tema_id, novo_ramo):
     if engine is None: return False
     try:
         with engine.begin() as conn:
-            stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo WHERE "Tema" = :tema')
+            # AGORA GRAVAMOS TAMBÉM A DATA ATUAL (NOW())
+            stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo, "data_ultima_alteracao" = NOW() WHERE "Tema" = :tema')
             conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
         st.cache_data.clear()
         st.session_state.data_needs_refresh = True
@@ -117,6 +118,18 @@ def atualizar_ramo_stf(tema_id, novo_ramo):
     except Exception as e:
         st.error(f"Erro ao atualizar banco: {e}")
         return False
+
+# NOVA FUNÇÃO: BUSCAR O ÚLTIMO EDITADO
+def get_ultimo_tema_editado():
+    if engine is None: return None
+    try:
+        # Pega o tema com a data mais recente
+        with engine.connect() as conn:
+            stmt = text('SELECT "Tema" FROM temas_stf WHERE "data_ultima_alteracao" IS NOT NULL ORDER BY "data_ultima_alteracao" DESC LIMIT 1')
+            result = conn.execute(stmt).fetchone()
+            return result[0] if result else None
+    except:
+        return None
 
 # --- 6. FUNÇÕES DE CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=600)
@@ -396,6 +409,10 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             total_pages_stf = math.ceil(total_items_stf / ITEMS_PER_PAGE) if total_items_stf > 0 else 1
 
             st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_top', on_change=sync_page_widgets, args=('page_stf_top', 'page_stf_bottom'))
+            # --- CÓDIGO NOVO AQUI ---
+            ultimo_editado = get_ultimo_tema_editado()
+            texto_ultimo = f" | 📝 **Último tema alterado manualmente: Tema {ultimo_editado}**" if ultimo_editado else ""
+            
             st.write(f"Mostrando página {st.session_state.page_stf_top} de {total_pages_stf} ({total_items_stf} temas encontrados).")
             
             start_index_stf = (st.session_state.page_stf_top - 1) * ITEMS_PER_PAGE
