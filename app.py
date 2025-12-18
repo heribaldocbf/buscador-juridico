@@ -20,8 +20,6 @@ if 'trigger_scroll_top' not in st.session_state:
     st.session_state.trigger_scroll_top = False
 
 if st.session_state.trigger_scroll_top:
-    # Este script manda o navegador "olhar" para a div #topo_da_pagina
-    # O timeout garante que o Streamlit termine de desenhar a tabela antes de pular
     js = f"""
     <script>
         setTimeout(function() {{
@@ -29,7 +27,6 @@ if st.session_state.trigger_scroll_top:
             if (topDiv) {{
                 topDiv.scrollIntoView({{block: "start", behavior: "auto"}});
             }}
-            // Reforço: tenta rolar a janela principal também
             window.parent.scrollTo(0, 0);
         }}, 100); 
     </script>
@@ -42,7 +39,6 @@ if st.session_state.trigger_scroll_top:
 SENHA_ADMIN = "060147mae"
 
 # Lista completa de Ramos (Sincronizada com o STJ/Robô)
-# Obs: O formato Title Case (letras maiúsculas em "Do", "E") é como o Python gera automaticamente.
 LISTA_RAMOS_COMPLETA = sorted([
     "Direito Administrativo",
     "Direito Ambiental",
@@ -60,38 +56,26 @@ LISTA_RAMOS_COMPLETA = sorted([
 ])
 
 # --- 3. INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
-if 'df_filtrado' not in st.session_state:
-    st.session_state.df_filtrado = pd.DataFrame()
-if 'titulo_resultados' not in st.session_state:
-    st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
-if 'filtros_ativos' not in st.session_state:
-    st.session_state.filtros_ativos = ("Nenhum", "Todos")
+if 'df_filtrado' not in st.session_state: st.session_state.df_filtrado = pd.DataFrame()
+if 'titulo_resultados' not in st.session_state: st.session_state.titulo_resultados = "Use os filtros acima e clique em buscar."
+if 'filtros_ativos' not in st.session_state: st.session_state.filtros_ativos = ("Nenhum", "Todos")
 
-# Paginação - Informativos
+# Paginação
 if 'page_informativos_top' not in st.session_state: st.session_state.page_informativos_top = 1
 if 'page_informativos_bottom' not in st.session_state: st.session_state.page_informativos_bottom = 1
-
-# Paginação - Temas
 if 'page_stf_top' not in st.session_state: st.session_state.page_stf_top = 1
 if 'page_stf_bottom' not in st.session_state: st.session_state.page_stf_bottom = 1
 if 'page_stj_top' not in st.session_state: st.session_state.page_stj_top = 1
 if 'page_stj_bottom' not in st.session_state: st.session_state.page_stj_bottom = 1
 
-# Controle Admin
 if 'data_needs_refresh' not in st.session_state: st.session_state.data_needs_refresh = False
 
-# --- 4. FUNÇÃO DE SINCRONIZAÇÃO (ATIVADOR DO SALTO) ---
+# --- 4. FUNÇÃO DE SINCRONIZAÇÃO ---
 def sync_page_widgets(source_key, target_key):
-    """
-    Se o usuário mexer no paginador de baixo, ativamos o gatilho 'Home'.
-    """
     if source_key in st.session_state and target_key in st.session_state:
-        if st.session_state[source_key] != st.session_state[target_key]:
-            st.session_state[target_key] = st.session_state[source_key]
-            
-            # Se a mudança veio de baixo, ativa o scroll para a âncora
-            if "bottom" in source_key:
-                st.session_state.trigger_scroll_top = True
+        st.session_state[target_key] = st.session_state[source_key]
+        if "bottom" in source_key:
+            st.session_state.trigger_scroll_top = True
 
 # --- 5. CONEXÃO COM O BANCO DE DADOS ---
 @st.cache_resource
@@ -104,14 +88,20 @@ def init_connection():
 
 engine = init_connection()
 
-# --- FUNÇÃO DE UPDATE (ADMIN) ---
+# --- FUNÇÕES DE UPDATE E LEITURA (ADMIN) ---
 def atualizar_ramo_stf(tema_id, novo_ramo):
     if engine is None: return False
     try:
         with engine.begin() as conn:
-            # AGORA GRAVAMOS TAMBÉM A DATA ATUAL (NOW())
-            stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo, "data_ultima_alteracao" = NOW() WHERE "Tema" = :tema')
-            conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
+            # Tenta atualizar com Data. Se a coluna não existir, o except captura.
+            try:
+                stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo, "data_ultima_alteracao" = NOW() WHERE "Tema" = :tema')
+                conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
+            except:
+                # Fallback caso a coluna de data ainda não tenha sido criada
+                stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo WHERE "Tema" = :tema')
+                conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
+                
         st.cache_data.clear()
         st.session_state.data_needs_refresh = True
         return True
@@ -119,12 +109,11 @@ def atualizar_ramo_stf(tema_id, novo_ramo):
         st.error(f"Erro ao atualizar banco: {e}")
         return False
 
-# NOVA FUNÇÃO: BUSCAR O ÚLTIMO EDITADO
 def get_ultimo_tema_editado():
     if engine is None: return None
     try:
-        # Pega o tema com a data mais recente
         with engine.connect() as conn:
+            # Tenta buscar a data. Se a coluna não existir, retorna None
             stmt = text('SELECT "Tema" FROM temas_stf WHERE "data_ultima_alteracao" IS NOT NULL ORDER BY "data_ultima_alteracao" DESC LIMIT 1')
             result = conn.execute(stmt).fetchone()
             return result[0] if result else None
@@ -153,7 +142,6 @@ def carregar_dados_stf():
     try:
         df = pd.read_sql_query('SELECT * FROM temas_stf', engine)
         df.columns = [col.replace('"', '') for col in df.columns]
-        # Garante numérico
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
         
         if 'Ramo do Direito' not in df.columns: 
@@ -165,9 +153,7 @@ def carregar_dados_stf():
         for col in colunas_stf_busca:
             if col not in df.columns: df[col] = ''
         
-        # Garante que Tese não seja NaN para filtros
         df['Tese'] = df['Tese'].fillna('')
-        
         df['busca'] = df[colunas_stf_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
@@ -180,25 +166,20 @@ def carregar_dados_stj():
     try:
         df = pd.read_sql_query('SELECT * FROM temas_stj', engine)
         df.columns = [col.replace('"', '') for col in df.columns]
-        # Garante numérico
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
 
-        # Adiciona "Questão submetida a julgamento" na busca
         colunas_stj_busca = ["Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema", "Questão submetida a julgamento"]
         for col in colunas_stj_busca:
             if col not in df.columns: df[col] = ''
             
-        # Garante que Tese Firmada não seja NaN para filtros
         if 'Tese Firmada' not in df.columns: df['Tese Firmada'] = ''
         df['Tese Firmada'] = df['Tese Firmada'].fillna('')
-            
         df['busca'] = df[colunas_stj_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
         st.error(f"Não foi possível carregar os dados do STJ: {e}")
         return None
 
-# --- FUNÇÕES AUXILIARES DE EXIBIÇÃO ---
 def exibir_item_informativo_agrupado(row):
     try:
         assunto_str = str(row.get('assunto', 'N/A')) if pd.notna(row.get('assunto')) else ""
@@ -211,7 +192,6 @@ def exibir_item_informativo_agrupado(row):
         query_codificada = urllib.parse.quote_plus(termo_de_busca)
         google_search_url = f"https://www.google.com/search?q={query_codificada}"
         link_html = f'<a href="{google_search_url}" target="_blank">{arquivo_pdf}</a>'
-        
         st.markdown(f"**ASSUNTO:** {assunto_str.upper()}")
         st.markdown(f"**TESE:** {tese_str} em {link_html} **({orgao})**", unsafe_allow_html=True)
         st.markdown("---")
@@ -239,10 +219,7 @@ if pagina_selecionada == "Navegador de Informativos":
         st.error("Não foi possível carregar os dados dos informativos.")
     else:
         st.header("Selecione os Filtros")
-        
         orgao_selecionado_cat = "Todos"
-        disciplina_selecionada_cat = "Todos"
-        assunto_selecionado_cat = "Todos"
         termo_busca_informativos = ""
         
         st.subheader("Filtrar por um Informativo Específico")
@@ -256,7 +233,6 @@ if pagina_selecionada == "Navegador de Informativos":
                 df_sorted = df_orgao_especifico.sort_values(by='num_inf', ascending=False)
                 lista_ordenada = df_sorted['arquivo_fonte'].str.replace('.docx', '.pdf').unique().tolist()
                 informativos_disponiveis += lista_ordenada
-
             informativo_selecionado = st.selectbox("Escolha o Informativo:", options=informativos_disponiveis, key="inf_select")
         
         disciplina_selecionada_dentro_inf = "Todas"
@@ -351,6 +327,7 @@ if pagina_selecionada == "Navegador de Informativos":
                         for _, row in grupo_df.iterrows():
                             exibir_item_informativo_agrupado(row)
             if total_pages > 1:
+                st.session_state.page_informativos_bottom = st.session_state.page_informativos_top
                 st.number_input('Página', min_value=1, max_value=total_pages, step=1, key='page_informativos_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_informativos_bottom', 'page_informativos_top'))
 
 
@@ -370,50 +347,42 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
         if df_stf is not None:
             st.header("Pesquisar Temas do STF")
             
-            # Layout de 3 colunas para incluir o filtro de teses
             c1, c2, c3 = st.columns([1.5, 1, 2])
             with c1:
                 ramos_disponiveis_stf = ["Todos"] + sorted(df_stf['Ramo do Direito'].astype(str).unique())
                 ramo_selecionado_stf = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis_stf, key="ramo_stf_filter")
             with c2:
-                # Novo campo: Opção Com Tese / Sem Tese
                 opcao_tese_stf = st.radio("Exibir:", ["Com tese", "Sem teses", "Todos"], index=0, key="filtro_tese_stf")
             with c3:
                 termo_busca_stf = st.text_input("Buscar por (Ctrl+F):", key="busca_stf")
 
-            # Aplicação dos Filtros
             df_resultado_stf = df_stf.copy()
-            
-            # 1. Filtro de Ramo
             if ramo_selecionado_stf != "Todos":
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['Ramo do Direito'] == ramo_selecionado_stf]
             
-            # 2. Filtro de Tese (Lógica)
             if opcao_tese_stf == "Com tese":
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['Tese'].str.strip() != '']
             elif opcao_tese_stf == "Sem teses":
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['Tese'].str.strip() == '']
             
-            # 3. Filtro de Busca Texto
             if termo_busca_stf:
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['busca'].str.contains(termo_busca_stf.lower(), na=False)]
                 if 'page_stf_top' in st.session_state:
                      st.session_state.page_stf_top = 1
                      st.session_state.page_stf_bottom = 1
             
-            # Ordenação por TEMA (Descendente)
             df_resultado_stf = df_resultado_stf.sort_values(by='Tema', ascending=False)
 
-            # Paginação
             total_items_stf = len(df_resultado_stf)
             total_pages_stf = math.ceil(total_items_stf / ITEMS_PER_PAGE) if total_items_stf > 0 else 1
 
             st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_top', on_change=sync_page_widgets, args=('page_stf_top', 'page_stf_bottom'))
-            # --- CÓDIGO NOVO AQUI ---
+            
+            # --- MOSTRA ÚLTIMA ALTERAÇÃO MANUAL ---
             ultimo_editado = get_ultimo_tema_editado()
             texto_ultimo = f" | 📝 **Último tema alterado manualmente: Tema {ultimo_editado}**" if ultimo_editado else ""
-            
-            st.write(f"Mostrando página {st.session_state.page_stf_top} de {total_pages_stf} ({total_items_stf} temas encontrados).")
+            st.write(f"Mostrando página {st.session_state.page_stf_top} de {total_pages_stf} ({total_items_stf} temas encontrados){texto_ultimo}")
+            # --------------------------------------
             
             start_index_stf = (st.session_state.page_stf_top - 1) * ITEMS_PER_PAGE
             end_index_stf = start_index_stf + ITEMS_PER_PAGE
@@ -423,7 +392,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             if not df_pagina_stf.empty:
                 for _, row in df_pagina_stf.iterrows():
                     ramo_atual = row.get('Ramo do Direito', 'Não Classificado')
-                    
                     st.markdown(f"#### Tema {row.get('Tema', 'N/A')} :blue-background[{ramo_atual}]")
                     st.markdown(f"**Título:** {row.get('Título', 'N/A')}")
                     st.markdown(f"**Tese:** {row.get('Tese', 'Pendente')}")
@@ -433,7 +401,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                         st.markdown(f"**Leading Case:** {row.get('Leading Case', '-')}")
                         st.markdown(f"**Julgamento:** {row.get('Data do Julgamento', '-')}")
                         
-                        # ÁREA DE ADMINISTRAÇÃO
                         if is_admin:
                             st.divider()
                             st.write("🛠️ **Admin: Alterar Classificação**")
@@ -444,8 +411,8 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                                     idx_inicial = LISTA_RAMOS_COMPLETA.index(ramo_atual)
                                 
                                 novo_ramo_sel = c_edit1.selectbox("Nova classificação:", 
-                                                                options=LISTA_RAMOS_COMPLETA, 
-                                                                index=idx_inicial)
+                                                                  options=LISTA_RAMOS_COMPLETA, 
+                                                                  index=idx_inicial)
                                 c_edit2.write("") 
                                 c_edit2.write("")
                                 if c_edit2.form_submit_button("Salvar"):
@@ -460,10 +427,8 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                     st.divider()
 
             if total_pages_stf > 1:
-                # Força o paginador de baixo a ter o mesmo valor do de cima antes de renderizar
                 st.session_state.page_stf_bottom = st.session_state.page_stf_top 
                 st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stf_bottom', 'page_stf_top'))
-
         else:
             st.error("Não foi possível carregar os dados do STF.")
 
@@ -478,35 +443,29 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 ramos_disponiveis = ["Todos"] + sorted(df_stj['Ramo do direito'].dropna().unique())
                 ramo_selecionado = st.selectbox("Filtrar por Ramo do Direito:", options=ramos_disponiveis, key="ramo_stj")
             with c2:
-                # Novo campo: Opção Com Tese / Sem Tese
                 opcao_tese_stj = st.radio("Exibir:", ["Com tese", "Sem teses", "Todos"], index=0, key="filtro_tese_stj")
             with c3:
                 termo_busca_stj = st.text_input("Buscar por (Ctrl+F):", key="busca_stj")
             
             df_resultado_stj = df_stj.copy()
-            # Reset paginação se mudar filtro
             if ramo_selecionado != st.session_state.get("ramo_selecionado_anterior", "Todos"):
                 st.session_state.page_stj_top = 1
                 st.session_state.page_stj_bottom = 1
             st.session_state.ramo_selecionado_anterior = ramo_selecionado
 
-            # 1. Filtro Ramo
             if ramo_selecionado != "Todos":
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['Ramo do direito'] == ramo_selecionado]
 
-            # 2. Filtro Tese (Lógica baseada em 'Tese Firmada')
             if opcao_tese_stj == "Com tese":
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['Tese Firmada'].str.strip() != '']
             elif opcao_tese_stj == "Sem teses":
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['Tese Firmada'].str.strip() == '']
 
-            # 3. Filtro Busca
             if termo_busca_stj:
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['busca'].str.contains(termo_busca_stj.lower(), na=False)]
                 st.session_state.page_stj_top = 1
                 st.session_state.page_stj_bottom = 1
             
-            # Ordenação por TEMA (Descendente)
             df_resultado_stj = df_resultado_stj.sort_values(by='Tema', ascending=False)
             
             total_items_stj = len(df_resultado_stj)
@@ -524,7 +483,6 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                 for _, row in df_pagina_stj.iterrows():
                     ramo = row.get('Ramo do direito', 'N/A')
                     st.markdown(f"#### Tema {row['Tema']} :blue-background[{ramo}]")
-                    # NOVO LAYOUT DO STJ: QUESTÃO + TESE VISÍVEIS
                     st.markdown(f"**Questão submetida a julgamento:** {row.get('Questão submetida a julgamento', '-')}")
                     st.markdown(f"**Tese Firmada:** {row.get('Tese Firmada', '-')}")
                     
@@ -535,9 +493,9 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                     st.divider()
             
             if total_pages_stj > 1:
-                #Força o paginador de baixo a ter o mesmo valor do de cima
                 st.session_state.page_stj_bottom = st.session_state.page_stj_top
-                st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))              
+                st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))
+
         else:
             st.error("Não foi possível carregar os dados do STJ.")
 
