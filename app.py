@@ -443,7 +443,10 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                     st.divider()
 
             if total_pages_stf > 1:
+                # Força o paginador de baixo a ter o mesmo valor do de cima antes de renderizar
+                st.session_state.page_stf_bottom = st.session_state.page_stf_top 
                 st.number_input('Página', min_value=1, max_value=total_pages_stf, step=1, key='page_stf_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stf_bottom', 'page_stf_top'))
+
         else:
             st.error("Não foi possível carregar os dados do STF.")
 
@@ -515,8 +518,9 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
                     st.divider()
             
             if total_pages_stj > 1:
-                st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))
-
+                #Força o paginador de baixo a ter o mesmo valor do de cima
+                st.session_state.page_stj_bottom = st.session_state.page_stj_top
+                st.number_input('Página', min_value=1, max_value=total_pages_stj, step=1, key='page_stj_bottom', label_visibility="collapsed", on_change=sync_page_widgets, args=('page_stj_bottom', 'page_stj_top'))              
         else:
             st.error("Não foi possível carregar os dados do STJ.")
 
