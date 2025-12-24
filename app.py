@@ -5,6 +5,7 @@ import math
 import urllib.parse
 import streamlit.components.v1 as components
 import time
+import re
 
 # --- 1. CONFIGURAÇÕES GERAIS ---
 ITEMS_PER_PAGE = 25
@@ -34,6 +35,31 @@ if st.session_state.trigger_scroll_top:
     """
     components.html(js, height=0)
     st.session_state.trigger_scroll_top = False
+
+# --- FUNÇÃO DE BUSCA INTELIGENTE ---
+def filtrar_dados(df, termo_busca):
+    """
+    Realiza busca inteligente:
+    - Com aspas ("termo exato"): Busca a frase exata.
+    - Sem aspas (termo livre): Busca palavras em qualquer ordem (AND).
+    """
+    if not termo_busca:
+        return df
+    
+    termo_busca = termo_busca.lower().strip()
+    
+    # Verifica se começa e termina com aspas
+    if termo_busca.startswith('"') and termo_busca.endswith('"'):
+        # Busca exata (remove aspas e busca a frase literal)
+        frase = termo_busca[1:-1]
+        return df[df['busca'].str.contains(frase, regex=False, na=False)]
+    else:
+        # Busca por palavras-chave (todas as palavras devem estar presentes)
+        palavras = termo_busca.split()
+        mask = pd.Series([True] * len(df))
+        for p in palavras:
+            mask = mask & df['busca'].str.contains(p, regex=False, na=False)
+        return df[mask]
 
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
@@ -219,7 +245,11 @@ if pagina_selecionada == "Navegador de Informativos":
         st.error("Não foi possível carregar os dados dos informativos.")
     else:
         st.header("Selecione os Filtros")
+        
+        # --- INICIALIZAÇÃO DE VARIÁVEIS DE FILTRO ---
         orgao_selecionado_cat = "Todos"
+        disciplina_selecionada_cat = "Todos"
+        assunto_selecionado_cat = "Todos"
         termo_busca_informativos = ""
         
         st.subheader("Filtrar por um Informativo Específico")
@@ -279,10 +309,12 @@ if pagina_selecionada == "Navegador de Informativos":
             else:
                 df_final = df_indice.copy()
                 if orgao_selecionado_cat != "Todos": df_final = df_final[df_final['orgao'] == orgao_selecionado_cat]
-                if disciplina_selecionada_cat != "Todos": df_final = df_final[df_final['disciplina'] == disciplina_selecionada_cat]
+                if disciplina_selecionada_cat != "Todas": df_final = df_final[df_final['disciplina'] == disciplina_selecionada_cat]
                 if assunto_selecionado_cat != "Todos": df_final = df_final[df_final['assunto'] == assunto_selecionado_cat]
+                
+                # --- BUSCA INTELIGENTE AQUI ---
                 if termo_busca_informativos:
-                    df_final = df_final[df_final['busca'].str.contains(termo_busca_informativos.lower(), na=False)]
+                    df_final = filtrar_dados(df_final, termo_busca_informativos)
             
             st.session_state.df_filtrado = df_final
             st.session_state.page_informativos_top = 1
@@ -365,8 +397,9 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             elif opcao_tese_stf == "Sem teses":
                 df_resultado_stf = df_resultado_stf[df_resultado_stf['Tese'].str.strip() == '']
             
+            # --- BUSCA INTELIGENTE AQUI ---
             if termo_busca_stf:
-                df_resultado_stf = df_resultado_stf[df_resultado_stf['busca'].str.contains(termo_busca_stf.lower(), na=False)]
+                df_resultado_stf = filtrar_dados(df_resultado_stf, termo_busca_stf)
                 if 'page_stf_top' in st.session_state:
                      st.session_state.page_stf_top = 1
                      st.session_state.page_stf_bottom = 1
@@ -461,8 +494,9 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             elif opcao_tese_stj == "Sem teses":
                 df_resultado_stj = df_resultado_stj[df_resultado_stj['Tese Firmada'].str.strip() == '']
 
+            # --- BUSCA INTELIGENTE AQUI ---
             if termo_busca_stj:
-                df_resultado_stj = df_resultado_stj[df_resultado_stj['busca'].str.contains(termo_busca_stj.lower(), na=False)]
+                df_resultado_stj = filtrar_dados(df_resultado_stj, termo_busca_stj)
                 st.session_state.page_stj_top = 1
                 st.session_state.page_stj_bottom = 1
             
