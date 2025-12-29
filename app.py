@@ -64,20 +64,24 @@ def filtrar_dados(df, termo_busca):
 # --- CONFIGURAÇÃO DE ADMINISTRAÇÃO ---
 SENHA_ADMIN = "060147mae"
 
-# Lista completa de Ramos (Sincronizada com o STJ/Robô)
+# Lista completa de Ramos (Sincronizada com os arquivos da pasta Temas STF)
 LISTA_RAMOS_COMPLETA = sorted([
     "Direito Administrativo",
     "Direito Ambiental",
     "Direito Civil",
-    "Direito Comercial",
-    "Direito Do Consumidor",
-    "Direito Do Trabalho E Processual Trabalhista",
+    "Direito do Consumidor",
+    "Direito do Trabalho",
+    "Direito Eleitoral",
+    "Direito Internacional",
     "Direito Penal",
+    "Direito Penal Militar",
     "Direito Previdenciário",
-    "Direito Processual Civil E Do Trabalho",
+    "Direito Processual Civil e do Trabalho",
     "Direito Processual Penal",
-    "Direito Processual Penal Militar",
     "Direito Tributário",
+    "Direito à Educação",
+    "Registros Públicos",
+    "Não Classificado",
     "Outros"
 ])
 
