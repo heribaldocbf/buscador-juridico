@@ -123,12 +123,10 @@ def atualizar_ramo_stf(tema_id, novo_ramo):
     if engine is None: return False
     try:
         with engine.begin() as conn:
-            # Tenta atualizar com Data. Se a coluna não existir, o except captura.
             try:
                 stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo, "data_ultima_alteracao" = NOW() WHERE "Tema" = :tema')
                 conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
             except:
-                # Fallback caso a coluna de data ainda não tenha sido criada
                 stmt = text('UPDATE temas_stf SET "Ramo do Direito" = :ramo WHERE "Tema" = :tema')
                 conn.execute(stmt, {"ramo": novo_ramo, "tema": tema_id})
                 
@@ -143,34 +141,50 @@ def get_ultimo_tema_editado():
     if engine is None: return None
     try:
         with engine.connect() as conn:
-            # Tenta buscar a data. Se a coluna não existir, retorna None
             stmt = text('SELECT "Tema" FROM temas_stf WHERE "data_ultima_alteracao" IS NOT NULL ORDER BY "data_ultima_alteracao" DESC LIMIT 1')
             result = conn.execute(stmt).fetchone()
             return result[0] if result else None
     except:
         return None
 
-# --- 6. FUNÇÕES DE CARREGAMENTO DE DADOS ---
-@st.cache_data(ttl=600)
+# --- 6. FUNÇÕES DE CARREGAMENTO DE DADOS (OTIMIZADAS) ---
+
+# OTIMIZAÇÃO: Cache aumentado para 24h (86400s)
+@st.cache_data(ttl=86400)
 def carregar_dados_informativos():
     if engine is None: return None
     try:
-        df = pd.read_sql_query("SELECT * FROM informativos", engine)
+        # OTIMIZAÇÃO: Selecionando apenas colunas usadas
+        query = """
+        SELECT arquivo_fonte, disciplina, assunto, tese, orgao 
+        FROM informativos
+        """
+        df = pd.read_sql_query(query, engine)
+        
         df['num_inf'] = df['arquivo_fonte'].str.extract(r'(\d+)').fillna(0).astype(int)
+        
         colunas_busca = ['disciplina', 'assunto', 'tese', 'orgao']
         for col in colunas_busca:
             if col not in df.columns: df[col] = ''
-        df['busca'] = df[colunas_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
+        
+        df['busca'] = df[colunas_busca].fillna('').astype(str).agg(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
         st.error(f"Não foi possível carregar os dados dos informativos: {e}")
         return None
 
-@st.cache_data(ttl=600)
+# OTIMIZAÇÃO: Cache aumentado para 24h
+@st.cache_data(ttl=86400)
 def carregar_dados_stf():
     if engine is None: return None
     try:
-        df = pd.read_sql_query('SELECT * FROM temas_stf', engine)
+        # OTIMIZAÇÃO: Removida a coluna 'Descrição' e outras não usadas
+        query = """
+        SELECT "Tema", "Título", "Tese", "Leading Case", "Situação do Tema", "Ramo do Direito", "Data do Julgamento"
+        FROM temas_stf
+        """
+        df = pd.read_sql_query(query, engine)
+        
         df.columns = [col.replace('"', '') for col in df.columns]
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
         
@@ -180,31 +194,38 @@ def carregar_dados_stf():
             df['Ramo do Direito'] = df['Ramo do Direito'].fillna('Não Classificado')
 
         colunas_stf_busca = ["Tema", "Tese", "Leading Case", "Título", "Situação do Tema", "Ramo do Direito"]
-        for col in colunas_stf_busca:
-            if col not in df.columns: df[col] = ''
+        # Filtra apenas colunas que realmente vieram no select
+        existentes = [c for c in colunas_stf_busca if c in df.columns]
         
         df['Tese'] = df['Tese'].fillna('')
-        df['busca'] = df[colunas_stf_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
+        df['busca'] = df[existentes].fillna('').astype(str).agg(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
         st.error(f"Não foi possível carregar os dados do STF: {e}")
         return None
 
-@st.cache_data(ttl=600)
+# OTIMIZAÇÃO: Cache aumentado para 24h
+@st.cache_data(ttl=86400)
 def carregar_dados_stj():
     if engine is None: return None
     try:
-        df = pd.read_sql_query('SELECT * FROM temas_stj', engine)
+        # OTIMIZAÇÃO: Redução drástica de colunas (de 40 para 7)
+        query = """
+        SELECT "Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema", "Questão submetida a julgamento", "Trânsito em Julgado"
+        FROM temas_stj
+        """
+        df = pd.read_sql_query(query, engine)
+        
         df.columns = [col.replace('"', '') for col in df.columns]
         df['Tema'] = pd.to_numeric(df['Tema'], errors='coerce').fillna(0).astype(int)
 
         colunas_stj_busca = ["Tema", "Tese Firmada", "Processo", "Ramo do direito", "Situação do Tema", "Questão submetida a julgamento"]
-        for col in colunas_stj_busca:
-            if col not in df.columns: df[col] = ''
+        existentes = [c for c in colunas_stj_busca if c in df.columns]
             
         if 'Tese Firmada' not in df.columns: df['Tese Firmada'] = ''
         df['Tese Firmada'] = df['Tese Firmada'].fillna('')
-        df['busca'] = df[colunas_stj_busca].fillna('').astype(str).apply(' '.join, axis=1).str.lower()
+        
+        df['busca'] = df[existentes].fillna('').astype(str).agg(' '.join, axis=1).str.lower()
         return df
     except Exception as e:
         st.error(f"Não foi possível carregar os dados do STJ: {e}")
@@ -405,8 +426,8 @@ elif pagina_selecionada == "Pesquisa de Temas (STF/STJ)":
             if termo_busca_stf:
                 df_resultado_stf = filtrar_dados(df_resultado_stf, termo_busca_stf)
                 if 'page_stf_top' in st.session_state:
-                     st.session_state.page_stf_top = 1
-                     st.session_state.page_stf_bottom = 1
+                      st.session_state.page_stf_top = 1
+                      st.session_state.page_stf_bottom = 1
             
             df_resultado_stf = df_resultado_stf.sort_values(by='Tema', ascending=False)
 
