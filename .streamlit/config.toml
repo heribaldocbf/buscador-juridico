@@ -2,14 +2,22 @@
 
 [theme]
 base = "dark"
+font = "sans serif"
+
+[theme.dark]
 primaryColor = "#D4AF37"
 backgroundColor = "#0D1117"
 secondaryBackgroundColor = "#1C2128"
 textColor = "#E6EDF3"
-font = "sans serif"
+
+[theme.light]
+primaryColor = "#B8860B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#31333F"
 
 [client]
-toolbarMode = "minimal"
+toolbarMode = "auto"
 
 [browser]
 gatherUsageStats = false
