@@ -1,0 +1,18 @@
+# Hub Jurídico — configuração visual (local + Streamlit Cloud)
+
+[theme]
+base = "dark"
+primaryColor = "#D4AF37"
+backgroundColor = "#0D1117"
+secondaryBackgroundColor = "#1C2128"
+textColor = "#E6EDF3"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+fastReruns = true

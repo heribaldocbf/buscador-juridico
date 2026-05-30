@@ -1,0 +1,48 @@
+# Ambiente Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Streamlit / secrets (nunca subir senhas)
+.streamlit/secrets.toml
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Estado local de processamento
+processamento_estado.json
+
+# Dados volumosos (só uso local; não precisam no GitHub/Cloud)
+Temas STF/
+*.xls
+*.xlsx
+*.csv
+RepercussaoGeral.xls
+relatorio.csv
+indice_analitico.txt
+indice_analitico.xlsx
+teses_stf_completo.csv
+relatorio_correspondencia.txt
+Lista_*.xlsx
+relatorio_temas_alterados_manualmente.xlsx
+
+# Documentos locais
+*.docx
+O Que Fazer*.docx
+
+# Temporários
+_temp_repo/
+*.tmp
+*.log
+.DS_Store
+Thumbs.db

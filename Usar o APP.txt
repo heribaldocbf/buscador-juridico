@@ -1,0 +1,5 @@
+streamlit run app.py
+python processar_informativos_inteligente.py
+
+# Credenciais locais: copie .env.example para .env e preencha os valores.
+# Streamlit Cloud: Settings > Secrets (DB_CONNECTION_STRING e ADMIN_PASSWORD)
