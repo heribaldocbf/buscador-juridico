@@ -1,0 +1,40 @@
+name: Manter App e Supabase Ativos
+
+on:
+  schedule:
+    # A cada 8 horas — evita o "Zzzz" do Streamlit Cloud (limite ~12h sem tráfego)
+    - cron: '0 */8 * * *'
+  workflow_dispatch:
+
+jobs:
+  keep_alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Acordar Streamlit Cloud
+        env:
+          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+        run: |
+          if [ -z "$STREAMLIT_APP_URL" ]; then
+            echo "STREAMLIT_APP_URL não configurado — pulando ping do app."
+            exit 0
+          fi
+          echo "Pingando $STREAMLIT_APP_URL ..."
+          curl -fsSL --max-time 90 "$STREAMLIT_APP_URL" -o /dev/null || true
+          sleep 45
+          curl -fsSL --max-time 120 "$STREAMLIT_APP_URL" -o /dev/null || true
+          echo "Ping Streamlit concluído."
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Ping Supabase (evita pausa por inatividade)
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+        run: |
+          pip install sqlalchemy psycopg2-binary
+          python keep_alive.py
