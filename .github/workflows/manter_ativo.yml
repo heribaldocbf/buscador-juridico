@@ -24,7 +24,7 @@ jobs:
           echo "Pingando $STREAMLIT_APP_URL ..."
           for i in 1 2; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" \
-              --max-redirs 5 --max-time 90 \
+              --max-redirs 0 --max-time 90 \
               -A "Mozilla/5.0 (compatible; KeepAlive/1.0)" \
               "$STREAMLIT_APP_URL" || echo "000")
             echo "Tentativa $i: HTTP $code"
