@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 PASTA_NOVOS_INFORMATIVOS = r"C:\Users\Heribaldo\Desktop\BD"
 
 # 2. Defina o nome do seu arquivo Excel que serve como índice mestre.
-ARQUIVO_INDICE_XLSX = "indice_analitico.xlsx"
+ARQUIVO_INDICE_XLSX = "indice_comparativo.xlsx"
 
 # 3. Nome do arquivo de texto que será gerado com a análise.
 ARQUIVO_RELATORIO_SAIDA = "relatorio_correspondencia.txt"
